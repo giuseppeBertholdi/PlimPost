@@ -106,7 +106,7 @@ export default function MarcaPage() {
 
       if (!isMounted) return;
 
-      let onboarding: typeof dataFull = dataFull;
+      let onboarding = dataFull;
       if (errorFull) {
         const { data: dataFallback, error: errorFallback } = await supabase
           .from("onboarding_profiles")
@@ -125,7 +125,7 @@ export default function MarcaPage() {
             ...dataFallback,
             brand_font_title: dataFallback.brand_font,
             brand_font_text: dataFallback.brand_font,
-          } as typeof dataFull;
+          } as unknown as typeof dataFull;
         } else {
           onboarding = null;
         }
