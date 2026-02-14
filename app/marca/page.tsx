@@ -119,7 +119,14 @@ export default function MarcaPage() {
           setIsLoading(false);
           return;
         }
-        onboarding = dataFallback;
+        // Adicionar campos faltantes com valores padrão do brand_font
+        if (dataFallback) {
+          onboarding = {
+            ...dataFallback,
+            brand_font_title: dataFallback.brand_font,
+            brand_font_text: dataFallback.brand_font,
+          } as typeof dataFull;
+        }
       }
 
       if (!onboarding?.onboarding_completed) {
