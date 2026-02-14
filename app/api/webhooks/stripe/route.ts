@@ -13,17 +13,22 @@ function getStripe() {
   });
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : null;
+// Inicializar Supabase Admin de forma lazy para evitar erros durante o build
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
@@ -105,6 +110,7 @@ export async function POST(request: Request) {
         );
       }
 
+      const supabaseAdmin = getSupabaseAdmin();
       if (!supabaseAdmin) {
         console.error("[Webhook] Supabase admin não configurado");
         return NextResponse.json(
