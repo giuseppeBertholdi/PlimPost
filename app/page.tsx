@@ -9,11 +9,11 @@ export default function Home() {
       <div className="pointer-events-none absolute -top-32 right-0 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
       <div className="pointer-events-none absolute left-0 top-40 h-80 w-80 rounded-full bg-orange-100/60 blur-3xl" />
 
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-8">
-        <div className="font-display text-xl font-semibold tracking-tight text-zinc-900">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6 sm:px-6 sm:py-8">
+        <div className="font-display text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
           PlimPost
         </div>
-        <nav className="hidden items-center gap-8 text-sm font-medium text-zinc-600 md:flex">
+        <nav className="hidden items-center gap-6 text-xs font-medium text-zinc-600 sm:gap-8 sm:text-sm md:flex">
           <a href="#recursos" className="hover:text-zinc-900">
             Recursos
           </a>
@@ -27,24 +27,24 @@ export default function Home() {
             Contato
           </a>
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden md:inline-flex">
             <GoogleLoginButton />
           </div>
-          <GoogleLoginDirect className="rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600" />
+          <GoogleLoginDirect className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600 sm:px-5 sm:py-2 sm:text-sm" />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-20">
-        <section className="relative mt-6 py-16 md:mt-10 md:py-20">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-12 sm:px-6 sm:pb-20">
+        <section className="relative mt-4 py-12 sm:mt-6 sm:py-16 md:mt-10 md:py-20">
           <div className="relative mx-auto flex max-w-3xl flex-col items-center text-center">
-            <span className="rounded-full bg-orange-100 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700">
+            <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700 sm:px-4">
               PlimPost para redes sociais
             </span>
-            <h1 className="font-display mt-6 text-4xl font-semibold leading-tight text-zinc-900 md:text-6xl">
+            <h1 className="font-display mt-4 text-3xl font-semibold leading-tight text-zinc-900 sm:mt-6 sm:text-4xl md:text-6xl">
               Gere posts profissionais para Instagram com IA
             </h1>
-            <p className="mt-4 text-base leading-7 text-zinc-600 md:text-lg">
+            <p className="mt-3 text-sm leading-7 text-zinc-600 sm:mt-4 sm:text-base md:text-lg">
               Crie imagens e legendas prontas para Instagram em segundos. 
               Design profissional, texto autêntico e pronto para publicar.
             </p>

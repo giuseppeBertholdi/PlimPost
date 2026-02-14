@@ -524,36 +524,38 @@ export default function HomePage() {
       <div className="pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
       <div className="pointer-events-none absolute left-0 top-32 h-80 w-80 rounded-full bg-orange-100/50 blur-3xl" />
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-6">
           <a
             href="/home"
-            className="font-display text-lg font-semibold text-zinc-900"
+            className="font-display text-base font-semibold text-zinc-900 sm:text-lg"
           >
             PlimPost
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="/creditos"
-              className="flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 shadow-sm transition hover:bg-orange-100"
+              className="flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:bg-orange-100 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
             >
               <span>💎</span>
-              <span>{credits ?? 0} {credits === 1 ? "crédito" : "créditos"}</span>
+              <span className="hidden sm:inline">{credits ?? 0} {credits === 1 ? "crédito" : "créditos"}</span>
+              <span className="sm:hidden">{credits ?? 0}</span>
             </a>
             <a
               href="/galeria"
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+              className="hidden rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:block sm:px-4 sm:py-2 sm:text-sm"
             >
               Galeria
             </a>
             <a
               href="/marca"
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+              className="hidden rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:block sm:px-4 sm:py-2 sm:text-sm"
             >
               Minha Marca
             </a>
             <details className="relative">
-            <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50">
-              Perfil
+            <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-2 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:px-3 sm:py-2 sm:text-sm">
+              <span className="hidden sm:inline">Perfil</span>
+              <span className="sm:hidden">⋯</span>
             </summary>
             <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
               <button
@@ -573,29 +575,29 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="relative w-full py-8">
-        <div className="mx-auto max-w-7xl px-6">
+      <main className="relative w-full py-6 sm:py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
           {/* Layout com anúncios laterais */}
-          <div className="flex gap-6">
+          <div className="flex gap-4 lg:gap-6">
             {/* Anúncio lateral esquerdo */}
             <aside className="hidden lg:block">
               <AdSidebar />
             </aside>
             
             {/* Conteúdo Principal */}
-            <div className="flex-1">
-            <div className="mb-8 text-center">
-          <h1 className="font-display text-3xl font-semibold text-zinc-900 md:text-4xl">
+            <div className="flex-1 min-w-0">
+            <div className="mb-6 text-center sm:mb-8">
+          <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl md:text-4xl">
             Olá, {displayName}! 👋
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 md:text-base">
+          <p className="mt-2 text-xs text-zinc-600 sm:text-sm md:text-base">
             Crie posts profissionais para suas redes sociais em segundos
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Card 1: Objetivo */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
                 1
@@ -605,7 +607,7 @@ export default function HomePage() {
                 <p className="text-xs text-zinc-500">Escolha o tipo de conteúdo que você quer criar</p>
               </div>
             </div>
-            <div className="ml-10 flex flex-wrap gap-2">
+            <div className="ml-0 flex flex-wrap gap-2 sm:ml-10">
               {[
                 { label: "Promover um Produto/Serviço", icon: "🛍️" },
                 { label: "Anunciar uma Novidade", icon: "🎉" },
@@ -656,7 +658,7 @@ export default function HomePage() {
           </div>
 
           {/* Card 2: Tema Central */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
                 2
@@ -666,7 +668,7 @@ export default function HomePage() {
                 <p className="text-xs text-zinc-500">Seja específico: descreva exatamente o que você quer comunicar no post</p>
               </div>
             </div>
-            <div className="ml-10">
+            <div className="ml-0 sm:ml-10">
               <textarea
                 value={mainTheme}
                 onChange={(event) => setMainTheme(event.target.value)}
@@ -688,7 +690,7 @@ export default function HomePage() {
           </div>
 
           {/* Card 3: Informações Adicionais */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-sm font-bold text-zinc-500">
                 3
@@ -700,7 +702,7 @@ export default function HomePage() {
                 <p className="text-xs text-zinc-500">Preços, detalhes, promoções, fonte de preferência, etc.</p>
               </div>
             </div>
-            <div className="ml-10">
+            <div className="ml-0 sm:ml-10">
               <textarea
                 value={extraInfo}
                 onChange={(event) => setExtraInfo(event.target.value)}
@@ -715,7 +717,7 @@ export default function HomePage() {
           </div>
 
           {/* Card 3.5: Imagem de Inspiração */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
                 🎨
@@ -727,7 +729,7 @@ export default function HomePage() {
                 <p className="text-xs text-zinc-500">Envie um post como exemplo para inspirar o design</p>
               </div>
             </div>
-            <div className="ml-10">
+            <div className="ml-0 sm:ml-10">
               {!inspirationImage ? (
                 <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-6 transition hover:border-orange-400 hover:bg-orange-50/30">
                   <input
@@ -880,7 +882,7 @@ export default function HomePage() {
           </div>
 
           {/* Card 4: Paleta de Cores + Fontes */}
-          <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
                 🎨
@@ -946,7 +948,7 @@ export default function HomePage() {
           </div>
 
           {/* Botão de Gerar */}
-          <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-6">
+          <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-4 sm:p-6">
             {errorMessage && !isLoading && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
                 <p className="text-sm font-semibold text-red-600">{errorMessage}</p>

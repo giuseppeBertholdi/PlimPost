@@ -108,31 +108,33 @@ export default function GaleriaPage() {
       <div className="pointer-events-none absolute left-0 top-32 h-80 w-80 rounded-full bg-orange-100/50 blur-3xl" />
       
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-6">
           <a
             href="/home"
-            className="font-display text-lg font-semibold text-zinc-900"
+            className="font-display text-base font-semibold text-zinc-900 sm:text-lg"
           >
             PlimPost
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="/home"
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:px-4 sm:py-2 sm:text-sm"
             >
-              Criar Post
+              <span className="hidden sm:inline">Criar Post</span>
+              <span className="sm:hidden">Criar</span>
             </a>
             <a
               href="/marca"
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+              className="hidden rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:block sm:px-4 sm:py-2 sm:text-sm"
             >
               Minha Marca
             </a>
             <details className="relative">
-              <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50">
-                Perfil
+              <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-2 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:px-3 sm:py-2 sm:text-sm">
+                <span className="hidden sm:inline">Perfil</span>
+                <span className="sm:hidden">⋯</span>
               </summary>
-              <div className="absolute right-0 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
+              <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -146,12 +148,12 @@ export default function GaleriaPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-6 py-12">
-        <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold text-zinc-900 md:text-4xl">
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl md:text-4xl">
             Galeria de Posts
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 md:text-base">
+          <p className="mt-2 text-xs text-zinc-600 sm:text-sm md:text-base">
             Todos os seus posts gerados
           </p>
         </div>
@@ -174,7 +176,7 @@ export default function GaleriaPage() {
             </p>
             <a
               href="/home"
-              className="inline-block rounded-lg bg-orange-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
+              className="inline-block rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-600 sm:px-6 sm:py-3 sm:text-sm"
             >
               Criar Primeiro Post
             </a>

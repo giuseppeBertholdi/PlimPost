@@ -152,24 +152,24 @@ function CreditosContent() {
       <div className="pointer-events-none absolute left-0 top-32 h-80 w-80 rounded-full bg-orange-100/50 blur-3xl" />
       
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-6">
           <a
             href="/home"
-            className="font-display text-lg font-semibold text-zinc-900"
+            className="font-display text-base font-semibold text-zinc-900 sm:text-lg"
           >
             PlimPost
           </a>
           <a
             href="/home"
-            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:px-4 sm:py-2 sm:text-sm"
           >
             Voltar
           </a>
         </div>
       </header>
 
-      <main className="relative w-full py-12">
-        <div className="mx-auto max-w-4xl px-6">
+      <main className="relative w-full py-8 sm:py-12">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
           {/* Mensagens de sucesso/cancelamento */}
           {success && (
             <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
@@ -194,17 +194,17 @@ function CreditosContent() {
           )}
 
           {/* Card de créditos atuais */}
-          <div className="mb-8 rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-8 shadow-lg">
+          <div className="mb-6 rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-6 shadow-lg sm:mb-8 sm:p-8">
             <div className="text-center">
-              <h1 className="font-display text-3xl font-semibold text-zinc-900 md:text-4xl">
+              <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl md:text-4xl">
                 Seus Créditos
               </h1>
               <div className="mt-4">
-                <div className="inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 shadow-md">
-                  <span className="text-5xl font-bold text-orange-600">
+                <div className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-md sm:gap-3 sm:px-8 sm:py-4">
+                  <span className="text-4xl font-bold text-orange-600 sm:text-5xl">
                     {credits ?? 0}
                   </span>
-                  <span className="text-lg text-zinc-600">
+                  <span className="text-base text-zinc-600 sm:text-lg">
                     {credits === 1 ? "crédito" : "créditos"}
                   </span>
                 </div>
@@ -216,13 +216,13 @@ function CreditosContent() {
           </div>
 
           {/* Pacotes de créditos */}
-          <div className="mb-8">
-            <h2 className="mb-6 text-center text-2xl font-semibold text-zinc-900">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="mb-4 text-center text-xl font-semibold text-zinc-900 sm:mb-6 sm:text-2xl">
               Comprar Créditos
             </h2>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
               {/* Pacote 1 crédito */}
-              <div className="rounded-2xl border-2 border-zinc-200 bg-white p-6 shadow-sm transition hover:border-orange-300 hover:shadow-md">
+              <div className="rounded-2xl border-2 border-zinc-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md sm:p-6">
                 <div className="mb-4 text-center">
                   <div className="mb-2 text-3xl font-bold text-zinc-900">1</div>
                   <div className="text-sm text-zinc-500">crédito</div>
@@ -240,7 +240,7 @@ function CreditosContent() {
               </div>
 
               {/* Pacote 20 créditos */}
-              <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50/50 to-white p-6 shadow-md transition hover:border-orange-400 hover:shadow-lg">
+              <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50/50 to-white p-4 shadow-md transition hover:border-orange-400 hover:shadow-lg sm:p-6">
                 <div className="mb-2 text-center">
                   <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
                     MAIS POPULAR
@@ -270,7 +270,7 @@ function CreditosContent() {
           </div>
 
           {/* Informações */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
             <h3 className="mb-4 font-semibold text-zinc-900">Como funciona?</h3>
             <ul className="space-y-2 text-sm text-zinc-600">
               <li className="flex items-start gap-2">
