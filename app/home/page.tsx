@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { TITLE_FONT_OPTIONS, TEXT_FONT_OPTIONS, DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT, getGoogleFontsCssUrl } from "@/lib/fonts";
+import { DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT } from "@/lib/fonts";
 import AdSidebar from "@/components/AdSidebar";
 
 type SessionUser = {
@@ -78,9 +78,6 @@ export default function HomePage() {
   const [mainTheme, setMainTheme] = useState("");
   const [extraInfo, setExtraInfo] = useState("");
   
-  // Estados de tipografia
-  const [fontTitle, setFontTitle] = useState(DEFAULT_FONT_TITLE);
-  const [fontText, setFontText] = useState(DEFAULT_FONT_TEXT);
   
   // Estados de opções avançadas
   const [additionalText, setAdditionalText] = useState("");
@@ -194,10 +191,6 @@ export default function HomePage() {
           brand_font_title: (onboardingData.brand_font_title as string | undefined) ?? undefined,
           brand_font_text: (onboardingData.brand_font_text as string | undefined) ?? undefined,
         });
-        const loadedTitle = (onboardingData.brand_font_title ?? onboardingData.brand_font) as string | undefined;
-        const loadedText = (onboardingData.brand_font_text ?? onboardingData.brand_font) as string | undefined;
-        setFontTitle(loadedTitle && TITLE_FONT_OPTIONS.some((f) => f.value === loadedTitle) ? loadedTitle : DEFAULT_FONT_TITLE);
-        setFontText(loadedText && TEXT_FONT_OPTIONS.some((f) => f.value === loadedText) ? loadedText : DEFAULT_FONT_TEXT);
 
         // Atualizar paleta se houver cores salvas
         const c1 = onboardingData.brand_color_primary as string | undefined;
@@ -270,9 +263,6 @@ export default function HomePage() {
               brand_font_title: undefined,
               brand_font_text: undefined,
             });
-            const bf = onboardingData.brand_font as string | undefined;
-            setFontTitle(bf && TITLE_FONT_OPTIONS.some((f) => f.value === bf) ? bf : DEFAULT_FONT_TITLE);
-            setFontText(bf && TEXT_FONT_OPTIONS.some((f) => f.value === bf) ? bf : DEFAULT_FONT_TEXT);
 
             if (onboardingData.brand_color_primary && 
                 onboardingData.brand_color_secondary && 
@@ -322,22 +312,6 @@ export default function HomePage() {
     loadCredits();
   }, [user?.id]);
 
-  // Carregar fontes do preview dinamicamente via Google Fonts API (com sua API key)
-  useEffect(() => {
-    let url = getGoogleFontsCssUrl([fontTitle, fontText]);
-    if (!url) return;
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_FONTS_API_KEY;
-    if (apiKey) url += `&key=${encodeURIComponent(apiKey)}`;
-    const id = "plimpost-preview-fonts";
-    let link = document.getElementById(id) as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.id = id;
-      link.rel = "stylesheet";
-      document.head.appendChild(link);
-    }
-    link.href = url;
-  }, [fontTitle, fontText]);
 
   const handleSignOut = async () => {
     try {
@@ -424,8 +398,8 @@ export default function HomePage() {
             : paletteOptions[selectedPalette]?.name ?? "Personalizada",
         colors: selectedPaletteColors,
       },
-      fontTitle: fontTitle || DEFAULT_FONT_TITLE,
-      fontText: fontText || DEFAULT_FONT_TEXT,
+      fontTitle: DEFAULT_FONT_TITLE,
+      fontText: DEFAULT_FONT_TEXT,
       additionalText: additionalText.trim() || undefined,
       imageStyle: imageStyle,
       textStyle: textStyle,
@@ -723,17 +697,20 @@ export default function HomePage() {
                 <h3 className="font-semibold text-zinc-900">
                   Informações adicionais <span className="text-xs font-normal text-zinc-400">(opcional)</span>
                 </h3>
-                <p className="text-xs text-zinc-500">Preços, detalhes, promoções, etc.</p>
+                <p className="text-xs text-zinc-500">Preços, detalhes, promoções, fonte de preferência, etc.</p>
               </div>
             </div>
             <div className="ml-10">
               <textarea
                 value={extraInfo}
                 onChange={(event) => setExtraInfo(event.target.value)}
-                placeholder="Ex: O hambúrguer custa R$ 39,90 e vem com fritas..."
+                placeholder="Ex: O hambúrguer custa R$ 39,90 e vem com fritas... Ou: Use a fonte Montserrat para o título"
                 rows={2}
                 className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm transition focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
               />
+              <p className="mt-2 text-xs text-zinc-500">
+                💡 Dica: Você pode especificar a fonte de sua preferência aqui. Exemplo: "Use a fonte Montserrat para o título e Open Sans para o texto"
+              </p>
             </div>
           </div>
 
@@ -964,61 +941,6 @@ export default function HomePage() {
                 <p className="mt-2 text-xs text-zinc-400">
                   💡 Clique nas cores para personalizar ou use "Alterar paleta" para escolher um conjunto pronto
                 </p>
-              </div>
-              {/* Fontes: Título e Texto */}
-              <div className="space-y-3">
-                <span className="text-sm font-semibold text-zinc-700">Fontes</span>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500">Título</label>
-                    <select
-                      value={fontTitle}
-                      onChange={(e) => setFontTitle(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-200"
-                    >
-                      {TITLE_FONT_OPTIONS.map((f) => (
-                        <option key={f.value} value={f.value}>{f.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500">Texto</label>
-                    <select
-                      value={fontText}
-                      onChange={(e) => setFontText(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-200"
-                    >
-                      {TEXT_FONT_OPTIONS.map((f) => (
-                        <option key={f.value} value={f.value}>{f.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {/* Preview das fontes ao selecionar */}
-                <div
-                  className="mt-4 rounded-xl border-2 border-zinc-200 bg-white p-4 shadow-sm"
-                  style={{
-                    backgroundColor: selectedPaletteColors[2] ? `${selectedPaletteColors[2]}08` : undefined,
-                    borderColor: selectedPaletteColors[0] ? `${selectedPaletteColors[0]}30` : undefined,
-                  }}
-                >
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Preview</p>
-                  <p
-                    className="text-xl font-bold leading-tight"
-                    style={{
-                      fontFamily: fontTitle,
-                      color: selectedPaletteColors[0] || undefined,
-                    }}
-                  >
-                    Título de exemplo
-                  </p>
-                  <p
-                    className="mt-2 text-sm leading-relaxed text-zinc-600"
-                    style={{ fontFamily: fontText }}
-                  >
-                    Texto do post em corpo menor, fácil de ler.
-                  </p>
-                </div>
               </div>
             </div>
           </div>

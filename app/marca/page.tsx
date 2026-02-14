@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { TITLE_FONT_OPTIONS, TEXT_FONT_OPTIONS, DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT } from "@/lib/fonts";
+import { DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT } from "@/lib/fonts";
 
 type SessionUser = {
   id: string;
@@ -74,8 +74,6 @@ export default function MarcaPage() {
     "#fb923c",
     "#0f172a",
   ]);
-  const [selectedFontTitle, setSelectedFontTitle] = useState(DEFAULT_FONT_TITLE);
-  const [selectedFontText, setSelectedFontText] = useState(DEFAULT_FONT_TEXT);
 
   const selectedPaletteColors = selectedPalette < 0 
     ? customPalette 
@@ -159,10 +157,6 @@ export default function MarcaPage() {
         setEditingTargetAudience(onboarding.target_audience);
         setEditingToneTags(onboarding.tone_tags ?? []);
         setLogoUrl(onboarding.logo_url);
-        const t = (o.brand_font_title ?? o.brand_font ?? DEFAULT_FONT_TITLE) as string;
-        const b = (o.brand_font_text ?? o.brand_font ?? DEFAULT_FONT_TEXT) as string;
-        setSelectedFontTitle(TITLE_FONT_OPTIONS.some((f) => f.value === t) ? t : DEFAULT_FONT_TITLE);
-        setSelectedFontText(TEXT_FONT_OPTIONS.some((f) => f.value === b) ? b : DEFAULT_FONT_TEXT);
 
         if (onboarding.brand_color_primary && onboarding.brand_color_secondary && onboarding.brand_color_text) {
           setCustomPalette([
@@ -289,9 +283,9 @@ export default function MarcaPage() {
         brand_color_primary: selectedPaletteColors[0],
         brand_color_secondary: selectedPaletteColors[1],
         brand_color_text: selectedPaletteColors[2],
-        brand_font: selectedFontTitle,
-        brand_font_title: selectedFontTitle,
-        brand_font_text: selectedFontText,
+        brand_font: DEFAULT_FONT_TITLE,
+        brand_font_title: DEFAULT_FONT_TITLE,
+        brand_font_text: DEFAULT_FONT_TEXT,
         updated_at: new Date().toISOString(),
       };
 
@@ -303,7 +297,7 @@ export default function MarcaPage() {
 
       if (error && (error.message.includes("brand_font_title") || error.message.includes("brand_font_text") || error.message.includes("does not exist"))) {
         const { brand_font_title: _t, brand_font_text: _b, ...updateDataFallback } = updateDataFull;
-        updateData = { ...updateDataFallback, brand_font: selectedFontTitle } as typeof updateData;
+        updateData = { ...updateDataFallback, brand_font: DEFAULT_FONT_TITLE } as typeof updateData;
         const res = await supabase.from("onboarding_profiles").update(updateData as any).eq("user_id", user.id);
         error = res.error;
       }
@@ -674,52 +668,6 @@ export default function MarcaPage() {
                   </div>
                 </div>
 
-                {/* Fontes: Título e Texto */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-zinc-700">Fonte do título</label>
-                    <select
-                      value={selectedFontTitle}
-                      onChange={(e) => setSelectedFontTitle(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 focus:border-orange-400 focus:outline-none"
-                    >
-                      {TITLE_FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-zinc-700">Fonte do texto</label>
-                    <select
-                      value={selectedFontText}
-                      onChange={(e) => setSelectedFontText(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 focus:border-orange-400 focus:outline-none"
-                    >
-                      {TEXT_FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4">
-                  <p className="text-sm text-zinc-500 mb-2">Preview:</p>
-                  <p
-                    className="text-lg font-semibold text-zinc-900 mb-1"
-                    style={{ fontFamily: selectedFontTitle }}
-                  >
-                    {onboarding?.business_name || "Nome da sua marca"}
-                  </p>
-                  <p
-                    className="text-sm text-zinc-600"
-                    style={{ fontFamily: selectedFontText }}
-                  >
-                    Corpo do post em fonte de texto.
-                  </p>
-                </div>
               </div>
 
               {/* Botão Salvar */}
