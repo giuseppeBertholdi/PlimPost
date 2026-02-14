@@ -1,5 +1,6 @@
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import AuthRedirectToHome from "@/components/AuthRedirectToHome";
+import GoogleLoginDirect from "@/components/GoogleLoginDirect";
 
 export default function Home() {
   return (
@@ -30,12 +31,7 @@ export default function Home() {
           <div className="hidden md:inline-flex">
             <GoogleLoginButton />
           </div>
-          <a
-            href="/"
-            className="rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
-          >
-            Começar agora
-          </a>
+          <GoogleLoginDirect className="rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600" />
         </div>
       </header>
 
@@ -53,12 +49,7 @@ export default function Home() {
               Design profissional, texto autêntico e pronto para publicar.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="/"
-                className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
-              >
-                Começar agora
-              </a>
+              <GoogleLoginDirect className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600" />
               <a
                 href="#como-funciona"
                 className="rounded-full border border-orange-200 px-6 py-3 text-sm font-semibold text-orange-700 transition hover:border-orange-300 hover:bg-orange-50"
@@ -241,12 +232,7 @@ export default function Home() {
                 <li>Design personalizado</li>
                 <li>Entrega instantânea</li>
               </ul>
-              <a
-                href="/"
-                className="mt-6 inline-flex w-full items-center justify-center rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
-              >
-                Comprar 1 crédito
-              </a>
+              <GoogleLoginDirect className="mt-6 inline-flex w-full items-center justify-center rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-50" />
             </div>
 
             <div className="relative rounded-[32px] border border-orange-200 bg-gradient-to-b from-orange-50 to-white p-8 shadow-xl shadow-orange-200/60">
@@ -268,12 +254,7 @@ export default function Home() {
                 <li>Paleta e fontes personalizáveis</li>
                 <li>Créditos não expiram</li>
               </ul>
-              <a
-                href="/"
-                className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
-              >
-                Comprar 20 créditos
-              </a>
+              <GoogleLoginDirect className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600" />
             </div>
 
             <div className="rounded-[28px] border border-orange-100 bg-white p-8 shadow-lg shadow-orange-100/60">
@@ -311,12 +292,7 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <a
-                href="/"
-                className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-              >
-                Começar agora
-              </a>
+              <GoogleLoginDirect className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" />
               <a
                 href="mailto:contato@plimpost.com"
                 className="rounded-full border border-orange-200 px-6 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"

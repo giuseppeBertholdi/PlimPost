@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { TITLE_FONT_OPTIONS, TEXT_FONT_OPTIONS, DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT, getGoogleFontsCssUrl } from "@/lib/fonts";
+import AdSidebar from "@/components/AdSidebar";
 
 type SessionUser = {
   id: string;
@@ -600,8 +601,15 @@ export default function HomePage() {
 
       <main className="relative w-full py-8">
         <div className="mx-auto max-w-7xl px-6">
-          {/* Conteúdo Principal */}
-          <div>
+          {/* Layout com anúncios laterais */}
+          <div className="flex gap-6">
+            {/* Anúncio lateral esquerdo */}
+            <aside className="hidden lg:block">
+              <AdSidebar />
+            </aside>
+            
+            {/* Conteúdo Principal */}
+            <div className="flex-1">
             <div className="mb-8 text-center">
           <h1 className="font-display text-3xl font-semibold text-zinc-900 md:text-4xl">
             Olá, {displayName}! 👋
@@ -1158,6 +1166,12 @@ export default function HomePage() {
             </div>
           )}
           </div>
+          </div>
+            
+            {/* Anúncio lateral direito */}
+            <aside className="hidden lg:block">
+              <AdSidebar />
+            </aside>
           </div>
         </div>
 
