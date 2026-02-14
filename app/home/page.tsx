@@ -457,6 +457,12 @@ export default function HomePage() {
       }
 
       if (!response.ok) {
+        // Handle timeout errors (504 Gateway Timeout)
+        if (response.status === 504 || data?.timeout) {
+          const timeoutMessage = data?.error || 
+            "A geração do post está demorando mais que o esperado. Isso pode acontecer quando há muitas requisições simultâneas ou quando a API do Gemini está lenta. Tente novamente em alguns instantes.";
+          throw new Error(timeoutMessage);
+        }
         // Handle quota exceeded errors with retry information
         if (data?.quotaExceeded) {
           const retryInfo = data.retryAfter 

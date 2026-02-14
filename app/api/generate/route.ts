@@ -464,6 +464,10 @@ export async function POST(request: Request) {
     // Primeiro, gerar o texto do post
     const prompt = buildPrompt(payload);
 
+    // Timeout de 25 segundos para a requisição de texto (deixar margem para o timeout do Netlify)
+    const textController = new AbortController();
+    const textTimeout = setTimeout(() => textController.abort(), 25000);
+
     const textResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
       {
@@ -482,10 +486,22 @@ export async function POST(request: Request) {
             maxOutputTokens: 400,
           },
         }),
+        signal: textController.signal,
       }
-    );
+    ).finally(() => clearTimeout(textTimeout));
 
     if (!textResponse.ok) {
+      // Verificar se foi timeout
+      if (textResponse.status === 0 || textResponse.type === 'error') {
+        return NextResponse.json(
+          {
+            error: "Timeout ao gerar o texto do post. A requisição demorou muito para responder. Tente novamente.",
+            timeout: true,
+          },
+          { status: 504 }
+        );
+      }
+      
       const errorData = await textResponse.json().catch(() => ({}));
       console.error("Gemini API error:", textResponse.status, errorData);
       
@@ -589,6 +605,10 @@ export async function POST(request: Request) {
         }
       }
 
+      // Timeout de 25 segundos para a requisição de imagem
+      const imageController = new AbortController();
+      const imageTimeout = setTimeout(() => imageController.abort(), 25000);
+
       const imageResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
         {
@@ -606,10 +626,22 @@ export async function POST(request: Request) {
               topP: 0.95,
             },
           }),
+          signal: imageController.signal,
         }
-      );
+      ).finally(() => clearTimeout(imageTimeout));
 
       if (!imageResponse.ok) {
+        // Verificar se foi timeout
+        if (imageResponse.status === 0 || imageResponse.type === 'error') {
+          // Salvar post (só texto) na galeria mesmo quando a imagem falha por timeout
+          await savePostToDb(payload, postText, null);
+          return NextResponse.json({
+            post: postText,
+            imageError: "Timeout ao gerar a imagem, mas o texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
+            timeout: true,
+          });
+        }
+        
         const errorData = await imageResponse.json().catch(() => ({}));
         console.error("Gemini Image API error:", imageResponse.status, errorData);
         // Salvar post (só texto) na galeria mesmo quando a imagem falha
@@ -709,6 +741,10 @@ IMPORTANTE: Gere uma legenda COMPLETA e DESENVOLVIDA. Não seja breve demais. A 
 Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 `.trim();
 
+          // Timeout de 20 segundos para a requisição de legenda
+          const captionController = new AbortController();
+          const captionTimeout = setTimeout(() => captionController.abort(), 20000);
+
           const captionResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
             {
@@ -735,8 +771,9 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
                   maxOutputTokens: 5000,
                 },
               }),
+              signal: captionController.signal,
             }
-          );
+          ).finally(() => clearTimeout(captionTimeout));
 
           if (captionResponse.ok) {
             const captionData = await captionResponse.json();
@@ -774,6 +811,18 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
     }
   } catch (error) {
     console.error("Generate API error:", error);
+    
+    // Verificar se foi timeout ou abort
+    if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+      return NextResponse.json(
+        {
+          error: "A requisição demorou muito para ser processada. Tente novamente com uma imagem mais simples ou sem imagem de inspiração.",
+          timeout: true,
+        },
+        { status: 504 }
+      );
+    }
+    
     return NextResponse.json(
       {
         error:
