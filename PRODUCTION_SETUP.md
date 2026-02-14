@@ -84,3 +84,5 @@ NEXT_PUBLIC_APP_URL=https://plimpost.com
 6. ✅ Créditos aparecem no header
 7. ✅ Geração de post consome créditos
 
+
+

@@ -1,29 +1,37 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase/client";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     const exchangeCode = async () => {
-      const code = searchParams.get("code");
+      try {
+        const code = searchParams.get("code");
 
-      if (!code || !hasSupabaseConfig) {
+        if (!code || !hasSupabaseConfig) {
+          router.replace("/");
+          return;
+        }
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          console.error("Supabase auth callback error:", error.message);
+        }
+
+        router.replace("/home");
+      } catch (error) {
+        console.error("Erro no callback:", error);
         router.replace("/");
-        return;
+      } finally {
+        setIsProcessing(false);
       }
-
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-      if (error) {
-        console.error("Supabase auth callback error:", error.message);
-      }
-
-      router.replace("/home");
     };
 
     exchangeCode();
@@ -31,7 +39,21 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white text-zinc-700">
-      Concluindo login...
+      {isProcessing ? "Concluindo login..." : "Redirecionando..."}
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-white text-zinc-700">
+          Concluindo login...
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
