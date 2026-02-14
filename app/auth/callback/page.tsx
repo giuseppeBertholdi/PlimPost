@@ -1,20 +1,33 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase/client";
 
-function AuthCallbackContent() {
+export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isProcessing, setIsProcessing] = useState(true);
+  const [code, setCode] = useState<string | null>(null);
 
   useEffect(() => {
+    // Usar window.location para evitar problemas de pre-render
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const codeParam = params.get("code");
+      setCode(codeParam);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!code) {
+      // Se não houver código, redirecionar para home
+      router.replace("/");
+      return;
+    }
+
     const exchangeCode = async () => {
       try {
-        const code = searchParams.get("code");
-
-        if (!code || !hasSupabaseConfig) {
+        if (!hasSupabaseConfig) {
           router.replace("/");
           return;
         }
@@ -23,6 +36,8 @@ function AuthCallbackContent() {
 
         if (error) {
           console.error("Supabase auth callback error:", error.message);
+          router.replace("/");
+          return;
         }
 
         router.replace("/home");
@@ -35,25 +50,11 @@ function AuthCallbackContent() {
     };
 
     exchangeCode();
-  }, [router, searchParams]);
+  }, [code, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white text-zinc-700">
       {isProcessing ? "Concluindo login..." : "Redirecionando..."}
     </div>
-  );
-}
-
-export default function AuthCallbackPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-white text-zinc-700">
-          Concluindo login...
-        </div>
-      }
-    >
-      <AuthCallbackContent />
-    </Suspense>
   );
 }

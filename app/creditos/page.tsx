@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
@@ -9,7 +9,7 @@ type SessionUser = {
   email?: string;
 };
 
-export default function CreditosPage() {
+function CreditosContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
@@ -294,6 +294,26 @@ export default function CreditosPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CreditosPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+          <div className="text-center">
+            <div className="relative mx-auto mb-6 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-orange-500"></div>
+            </div>
+            <h2 className="font-display text-xl font-semibold text-zinc-900">Carregando...</h2>
+          </div>
+        </div>
+      }
+    >
+      <CreditosContent />
+    </Suspense>
   );
 }
 
