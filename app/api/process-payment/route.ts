@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2025-02-24.acacia",
-});
+// Inicializar Stripe de forma lazy para evitar erros durante o build
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY não configurada");
+  }
+  return new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+  });
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -41,6 +48,16 @@ export async function POST(request: Request) {
     }
 
     // Buscar a sessão do Stripe
+    let stripe: Stripe;
+    try {
+      stripe = getStripe();
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Stripe não configurado" },
+        { status: 500 }
+      );
+    }
+
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent'],
     });

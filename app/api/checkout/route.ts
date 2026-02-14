@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2025-02-24.acacia",
-});
+// Inicializar Stripe de forma lazy para evitar erros durante o build
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY não configurada");
+  }
+  return new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+  });
+}
 
 // ⚠️ PRODUÇÃO: Atualizar os price_id abaixo com os IDs de PRODUÇÃO do Stripe
 // Os IDs atuais são de TESTE. Crie produtos no Stripe Dashboard (modo Live) e substitua.
@@ -43,7 +50,10 @@ export async function POST(request: Request) {
 
     const packageInfo = PRICE_MAP[packageType];
 
-    if (!stripe) {
+    let stripe: Stripe;
+    try {
+      stripe = getStripe();
+    } catch (error) {
       return NextResponse.json(
         { error: "Stripe não configurado" },
         { status: 500 }
