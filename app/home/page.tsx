@@ -1,0 +1,1207 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+import { TITLE_FONT_OPTIONS, TEXT_FONT_OPTIONS, DEFAULT_FONT_TITLE, DEFAULT_FONT_TEXT, getGoogleFontsCssUrl } from "@/lib/fonts";
+
+type SessionUser = {
+  id: string;
+  email?: string;
+};
+
+type OnboardingProfile = {
+  business_name: string;
+  business_description: string;
+  business_differential: string;
+  tone_tags: string[];
+  target_audience: string;
+  logo_url?: string;
+  brand_color_primary?: string;
+  brand_color_secondary?: string;
+  brand_color_text?: string;
+  brand_font?: string;
+  brand_font_title?: string;
+  brand_font_text?: string;
+};
+
+export default function HomePage() {
+  const router = useRouter();
+  
+  // Estados de autenticação e dados do usuário
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingProfile | null>(null);
+  
+  // Estados de geração de post
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedPost, setGeneratedPost] = useState("");
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Estado de créditos
+  const [credits, setCredits] = useState<number | null>(null);
+  
+  // Estados de paleta de cores
+  // selectedPalette: índice da paleta selecionada (-1 = paleta personalizada)
+  const [selectedPalette, setSelectedPalette] = useState(0);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [customPalette, setCustomPalette] = useState([
+    "#f97316",
+    "#fb923c",
+    "#0f172a",
+  ]);
+  
+  // Estados do formulário de post
+  const [objective, setObjective] = useState("Promover um Produto/Serviço");
+  const [customObjective, setCustomObjective] = useState("");
+  const [isCustomObjective, setIsCustomObjective] = useState(false);
+  const [mainTheme, setMainTheme] = useState("");
+  const [extraInfo, setExtraInfo] = useState("");
+  
+  // Estados de tipografia
+  const [fontTitle, setFontTitle] = useState(DEFAULT_FONT_TITLE);
+  const [fontText, setFontText] = useState(DEFAULT_FONT_TEXT);
+  
+  // Estados de opções avançadas
+  const [additionalText, setAdditionalText] = useState("");
+  const [imageStyle, setImageStyle] = useState("moderno");
+  const [textStyle, setTextStyle] = useState("padrão");
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  
+  // Estado para imagem de inspiração
+  const [inspirationImage, setInspirationImage] = useState<string | null>(null);
+  const [inspirationImageFile, setInspirationImageFile] = useState<File | null>(null);
+  
+  // Refs para controle de geração e carregamento inicial
+  const isGeneratingRef = useRef(false);
+  const initialLoadCompleteRef = useRef(false);
+
+  const paletteOptions = [
+    { name: "Vibrante", colors: ["#f97316", "#fb923c", "#0f172a"] },
+    { name: "Azul", colors: ["#2563eb", "#60a5fa", "#0f172a"] },
+    { name: "Roxo", colors: ["#7c3aed", "#a78bfa", "#111827"] },
+    { name: "Verde", colors: ["#16a34a", "#86efac", "#052e16"] },
+    { name: "Rosa", colors: ["#db2777", "#f9a8d4", "#111827"] },
+    { name: "Neutro", colors: ["#111827", "#9ca3af", "#f3f4f6"] },
+    { name: "Terra", colors: ["#a16207", "#f59e0b", "#3f1d0b"] },
+    { name: "Citrus", colors: ["#f59e0b", "#fde68a", "#1f2937"] },
+    { name: "Marinho", colors: ["#0f172a", "#38bdf8", "#e2e8f0"] },
+    { name: "Pastel", colors: ["#fda4af", "#bfdbfe", "#1f2937"] },
+    { name: "Açai", colors: ["#5b21b6", "#c4b5fd", "#0f172a"] },
+    { name: "Minimal", colors: ["#111827", "#e5e7eb", "#ffffff"] },
+    { name: "Moderno", colors: ["#0891b2", "#67e8f9", "#0f172a"] },
+    { name: "Premium", colors: ["#111827", "#f5d0fe", "#4c1d95"] },
+    { name: "Quente", colors: ["#ef4444", "#fca5a5", "#1f2937"] },
+  ];
+
+  const selectedPaletteColors = useMemo(() => {
+    if (selectedPalette < 0) return customPalette;
+    return paletteOptions[selectedPalette]?.colors ?? customPalette;
+  }, [selectedPalette, customPalette, paletteOptions]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+
+        const sessionUser = sessionData.session?.user;
+        if (!sessionUser) {
+          router.replace("/");
+          return;
+        }
+
+        setUser({ id: sessionUser.id, email: sessionUser.email });
+
+        // Tentar com colunas novas (brand_font_title, brand_font_text); se falhar (ex.: migração não aplicada), usar só colunas antigas
+        let onboardingData: Record<string, unknown> | null = null;
+        const fullSelect = "user_id,onboarding_completed,business_name,business_description,business_differential,tone_tags,target_audience,logo_url,brand_color_primary,brand_color_secondary,brand_color_text,brand_font,brand_font_title,brand_font_text";
+        const fallbackSelect = "user_id,onboarding_completed,business_name,business_description,business_differential,tone_tags,target_audience,logo_url,brand_color_primary,brand_color_secondary,brand_color_text,brand_font";
+
+        const { data: dataFull, error: errorFull } = await supabase
+          .from("onboarding_profiles")
+          .select(fullSelect)
+          .eq("user_id", sessionUser.id)
+          .maybeSingle();
+
+        if (!isMounted) return;
+
+        if (errorFull) {
+          const { data: dataFallback, error: errorFallback } = await supabase
+            .from("onboarding_profiles")
+            .select(fallbackSelect)
+            .eq("user_id", sessionUser.id)
+            .maybeSingle();
+          if (!isMounted) return;
+          if (errorFallback) {
+            console.error("Failed to load onboarding:", errorFallback.message || errorFallback.code || errorFallback);
+            setIsLoading(false);
+            initialLoadCompleteRef.current = true;
+            return;
+          }
+          onboardingData = dataFallback as Record<string, unknown>;
+        } else {
+          onboardingData = dataFull as Record<string, unknown>;
+        }
+
+        if (!onboardingData?.onboarding_completed) {
+          router.replace("/onboarding");
+          setIsLoading(false);
+          initialLoadCompleteRef.current = true;
+          return;
+        }
+
+        // Atualizar estado do onboarding
+        const name = onboardingData.business_name as string;
+        const desc = onboardingData.business_description as string;
+        const diff = onboardingData.business_differential as string;
+        const audience = onboardingData.target_audience as string;
+        const tags = (onboardingData.tone_tags ?? []) as string[];
+        setOnboarding({
+          business_name: name,
+          business_description: desc,
+          business_differential: diff,
+          tone_tags: tags,
+          target_audience: audience,
+          logo_url: (onboardingData.logo_url as string | undefined) ?? undefined,
+          brand_color_primary: (onboardingData.brand_color_primary as string | undefined) ?? undefined,
+          brand_color_secondary: (onboardingData.brand_color_secondary as string | undefined) ?? undefined,
+          brand_color_text: (onboardingData.brand_color_text as string | undefined) ?? undefined,
+          brand_font: (onboardingData.brand_font as string | undefined) ?? undefined,
+          brand_font_title: (onboardingData.brand_font_title as string | undefined) ?? undefined,
+          brand_font_text: (onboardingData.brand_font_text as string | undefined) ?? undefined,
+        });
+        const loadedTitle = (onboardingData.brand_font_title ?? onboardingData.brand_font) as string | undefined;
+        const loadedText = (onboardingData.brand_font_text ?? onboardingData.brand_font) as string | undefined;
+        setFontTitle(loadedTitle && TITLE_FONT_OPTIONS.some((f) => f.value === loadedTitle) ? loadedTitle : DEFAULT_FONT_TITLE);
+        setFontText(loadedText && TEXT_FONT_OPTIONS.some((f) => f.value === loadedText) ? loadedText : DEFAULT_FONT_TEXT);
+
+        // Atualizar paleta se houver cores salvas
+        const c1 = onboardingData.brand_color_primary as string | undefined;
+        const c2 = onboardingData.brand_color_secondary as string | undefined;
+        const c3 = onboardingData.brand_color_text as string | undefined;
+        if (c1 && c2 && c3) {
+          setCustomPalette([c1, c2, c3]);
+          setSelectedPalette(-1);
+        }
+
+        setIsLoading(false);
+        initialLoadCompleteRef.current = true;
+      } catch (err) {
+        console.error("Error loading data:", err);
+        if (isMounted) {
+          setIsLoading(false);
+          initialLoadCompleteRef.current = true;
+        }
+      }
+    };
+
+    loadData();
+
+    // Listener para atualizar quando dados mudarem (após carregamento inicial)
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted || isGeneratingRef.current) return;
+        
+        // Ignorar refresh de token e eventos durante carregamento inicial
+        if (event === 'TOKEN_REFRESHED' || !initialLoadCompleteRef.current) return;
+
+        if (!session) {
+          router.replace("/");
+          return;
+        }
+
+        // Recarregar dados quando necessário (colunas básicas para não falhar se migração de fontes não foi aplicada)
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          // Recarregar créditos
+          try {
+            const creditsResponse = await fetch(`/api/credits?userId=${session.user.id}`);
+            if (creditsResponse.ok) {
+              const creditsData = await creditsResponse.json();
+              setCredits(creditsData.credits ?? 0);
+            }
+          } catch (err) {
+            console.error("Erro ao recarregar créditos:", err);
+          }
+
+          const { data: onboardingData } = await supabase
+            .from("onboarding_profiles")
+            .select("user_id,onboarding_completed,business_name,business_description,business_differential,tone_tags,target_audience,logo_url,brand_color_primary,brand_color_secondary,brand_color_text,brand_font")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+          if (!isMounted) return;
+
+          if (onboardingData?.onboarding_completed) {
+            setOnboarding({
+              business_name: onboardingData.business_name,
+              business_description: onboardingData.business_description,
+              business_differential: onboardingData.business_differential,
+              tone_tags: onboardingData.tone_tags ?? [],
+              target_audience: onboardingData.target_audience,
+              logo_url: onboardingData.logo_url ?? undefined,
+              brand_color_primary: onboardingData.brand_color_primary ?? undefined,
+              brand_color_secondary: onboardingData.brand_color_secondary ?? undefined,
+              brand_color_text: onboardingData.brand_color_text ?? undefined,
+              brand_font: onboardingData.brand_font ?? undefined,
+              brand_font_title: undefined,
+              brand_font_text: undefined,
+            });
+            const bf = onboardingData.brand_font as string | undefined;
+            setFontTitle(bf && TITLE_FONT_OPTIONS.some((f) => f.value === bf) ? bf : DEFAULT_FONT_TITLE);
+            setFontText(bf && TEXT_FONT_OPTIONS.some((f) => f.value === bf) ? bf : DEFAULT_FONT_TEXT);
+
+            if (onboardingData.brand_color_primary && 
+                onboardingData.brand_color_secondary && 
+                onboardingData.brand_color_text) {
+              setCustomPalette([
+                onboardingData.brand_color_primary,
+                onboardingData.brand_color_secondary,
+                onboardingData.brand_color_text,
+              ]);
+              setSelectedPalette(-1);
+            }
+          }
+        }
+      }
+    );
+
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  // Carregar créditos quando o usuário estiver disponível
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const loadCredits = async () => {
+      try {
+        const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
+        if (creditsResponse.ok) {
+          const creditsData = await creditsResponse.json();
+          setCredits(creditsData.credits ?? 0);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar créditos:", err);
+      }
+    };
+
+    loadCredits();
+  }, [user?.id]);
+
+  // Carregar fontes do preview dinamicamente via Google Fonts API (com sua API key)
+  useEffect(() => {
+    let url = getGoogleFontsCssUrl([fontTitle, fontText]);
+    if (!url) return;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_FONTS_API_KEY;
+    if (apiKey) url += `&key=${encodeURIComponent(apiKey)}`;
+    const id = "plimpost-preview-fonts";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = url;
+  }, [fontTitle, fontText]);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.replace("/");
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setErrorMessage(null);
+    setGeneratedPost("");
+    setGeneratedImage(null);
+
+    // Verificar se está carregando antes de validar
+    if (isLoading) {
+      setErrorMessage("Aguarde, carregando dados...");
+      return;
+    }
+
+    if (!onboarding) {
+      setErrorMessage("Complete o onboarding para gerar um post.");
+      return;
+    }
+
+    if (!user?.id) {
+      setErrorMessage("Sessão expirada. Por favor, faça login novamente.");
+      return;
+    }
+
+    if (!mainTheme.trim()) {
+      setErrorMessage("Informe o tema central do post.");
+      return;
+    }
+
+    const finalObjective =
+      objective === "Outro" ? customObjective.trim() : objective;
+
+    if (!finalObjective) {
+      setErrorMessage("Descreva o objetivo do post.");
+      return;
+    }
+
+    setIsGenerating(true);
+    isGeneratingRef.current = true;
+
+    // Garantir userId atual da sessão para salvar na galeria
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserId = session?.user?.id ?? user?.id;
+
+    // Converter imagem de inspiração para base64 se houver
+    let inspirationImageBase64: string | undefined = undefined;
+    if (inspirationImageFile) {
+      try {
+        const arrayBuffer = await inspirationImageFile.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
+        );
+        // Extrair o tipo MIME da imagem
+        const mimeType = inspirationImageFile.type || "image/png";
+        inspirationImageBase64 = `data:${mimeType};base64,${base64}`;
+      } catch (error) {
+        console.error("Erro ao converter imagem para base64:", error);
+        setErrorMessage("Erro ao processar a imagem de inspiração.");
+        setIsGenerating(false);
+        isGeneratingRef.current = false;
+        return;
+      }
+    }
+
+    const payload = {
+      onboarding,
+      objective: finalObjective,
+      mainTheme: mainTheme.trim(),
+      extraInfo: extraInfo.trim(),
+      palette: {
+        name:
+          selectedPalette < 0
+            ? "Personalizada"
+            : paletteOptions[selectedPalette]?.name ?? "Personalizada",
+        colors: selectedPaletteColors,
+      },
+      fontTitle: fontTitle || DEFAULT_FONT_TITLE,
+      fontText: fontText || DEFAULT_FONT_TEXT,
+      additionalText: additionalText.trim() || undefined,
+      imageStyle: imageStyle,
+      textStyle: textStyle,
+      userId: currentUserId,
+      inspirationImage: inspirationImageBase64,
+    };
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        // Handle quota exceeded errors with retry information
+        if (data?.quotaExceeded) {
+          const retryInfo = data.retryAfter 
+            ? ` Tente novamente em aproximadamente ${Math.ceil(data.retryAfter)} segundos.`
+            : "";
+          throw new Error(data.error + retryInfo);
+        }
+        // Handle insufficient credits
+        if (data?.insufficientCredits || response.status === 402) {
+          setErrorMessage(data.error || "Créditos insuficientes. Compre mais créditos para continuar gerando posts.");
+          // Recarregar créditos
+          if (user?.id) {
+            try {
+              const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
+              if (creditsResponse.ok) {
+                const creditsData = await creditsResponse.json();
+                setCredits(creditsData.credits ?? 0);
+              }
+            } catch (err) {
+              console.error("Erro ao recarregar créditos:", err);
+            }
+          }
+          throw new Error(data.error || "Créditos insuficientes");
+        }
+        throw new Error(data?.error || "Erro ao gerar o post.");
+      }
+
+      setGeneratedPost(data.post ?? "");
+      // Usar imageUrl se disponível (imagem salva), senão usar base64
+      setGeneratedImage(data.imageUrl ?? data.image ?? null);
+      
+      // Recarregar créditos após gerar post
+      if (user?.id) {
+        try {
+          const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
+          if (creditsResponse.ok) {
+            const creditsData = await creditsResponse.json();
+            setCredits(creditsData.credits ?? 0);
+          }
+        } catch (err) {
+          console.error("Erro ao recarregar créditos:", err);
+        }
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao gerar o post.";
+      setErrorMessage(message);
+    } finally {
+      setIsGenerating(false);
+      isGeneratingRef.current = false;
+    }
+  };
+
+  // Só renderizar quando dados estiverem carregados
+  if (isLoading || !onboarding) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+        <div className="text-center">
+          <div className="relative mx-auto mb-6 h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-orange-500"></div>
+          </div>
+          <h2 className="font-display text-xl font-semibold text-zinc-900">Carregando...</h2>
+          <p className="mt-2 text-sm text-zinc-600">Preparando sua área de trabalho</p>
+        </div>
+      </div>
+    );
+  }
+
+  const displayName = onboarding.business_name || user?.email?.split("@")[0] || "usuário";
+
+  return (
+    <div className="plimpost-dotted relative min-h-screen bg-zinc-50">
+      <div className="pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute left-0 top-32 h-80 w-80 rounded-full bg-orange-100/50 blur-3xl" />
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+          <a
+            href="/home"
+            className="font-display text-lg font-semibold text-zinc-900"
+          >
+            PlimPost
+          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="/creditos"
+              className="flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 shadow-sm transition hover:bg-orange-100"
+            >
+              <span>💎</span>
+              <span>{credits ?? 0} {credits === 1 ? "crédito" : "créditos"}</span>
+            </a>
+            <a
+              href="/galeria"
+              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+            >
+              Galeria
+            </a>
+            <a
+              href="/marca"
+              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+            >
+              Minha Marca
+            </a>
+            <details className="relative">
+            <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50">
+              Perfil
+            </summary>
+            <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSignOut();
+                }}
+                className="block w-full rounded-xl px-3 py-2 text-left text-red-500 transition hover:bg-zinc-50"
+              >
+                Sair
+              </button>
+            </div>
+          </details>
+          </div>
+        </div>
+      </header>
+
+      <main className="relative w-full py-8">
+        <div className="mx-auto max-w-7xl px-6">
+          {/* Conteúdo Principal */}
+          <div>
+            <div className="mb-8 text-center">
+          <h1 className="font-display text-3xl font-semibold text-zinc-900 md:text-4xl">
+            Olá, {displayName}! 👋
+          </h1>
+          <p className="mt-2 text-sm text-zinc-600 md:text-base">
+            Crie posts profissionais para suas redes sociais em segundos
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Card 1: Objetivo */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
+                1
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">Qual é o objetivo do post?</h3>
+                <p className="text-xs text-zinc-500">Escolha o tipo de conteúdo que você quer criar</p>
+              </div>
+            </div>
+            <div className="ml-10 flex flex-wrap gap-2">
+              {[
+                { label: "Promover um Produto/Serviço", icon: "🛍️" },
+                { label: "Anunciar uma Novidade", icon: "🎉" },
+                { label: "Engajar/Conectar", icon: "💬" },
+                { label: "Educar/Dar uma Dica", icon: "💡" },
+                { label: "Outro", icon: "✨" },
+              ].map(({ label, icon }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    if (label === "Outro") {
+                      setIsCustomObjective(true);
+                      setObjective("Outro");
+                    } else {
+                      setIsCustomObjective(false);
+                      setObjective(label);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                    objective === label
+                      ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-200 hover:bg-orange-50/50"
+                  }`}
+                >
+                  <span>{icon}</span>
+                  <span>
+                    {label === "Promover um Produto/Serviço" && "Promover"}
+                    {label === "Anunciar uma Novidade" && "Anunciar"}
+                    {label === "Engajar/Conectar" && "Engajar"}
+                    {label === "Educar/Dar uma Dica" && "Educar"}
+                    {label === "Outro" && "Outro"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {isCustomObjective && (
+              <div className="ml-10 mt-3">
+                <input
+                  type="text"
+                  value={customObjective}
+                  onChange={(event) => setCustomObjective(event.target.value)}
+                  placeholder="Descreva o objetivo do post..."
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-700 shadow-sm transition focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: Tema Central */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
+                2
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">Tema central do post</h3>
+                <p className="text-xs text-zinc-500">Seja específico: descreva exatamente o que você quer comunicar no post</p>
+              </div>
+            </div>
+            <div className="ml-10">
+              <textarea
+                value={mainTheme}
+                onChange={(event) => setMainTheme(event.target.value)}
+                placeholder="Exemplo detalhado: Lançamento do nosso novo hambúrguer de costela com barbecue artesanal. O hambúrguer tem 200g de carne, queijo cheddar, bacon crocante e molho especial. Disponível apenas este fim de semana com desconto de 20%."
+                rows={4}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm transition focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+              />
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-zinc-500">
+                  💡 <strong>Dica:</strong> Seja o mais específico possível! Inclua detalhes como: o que está sendo promovido, características principais, preços, promoções, prazos, etc.
+                </p>
+                {mainTheme.trim() && (
+                  <p className="text-xs text-zinc-400">
+                    {mainTheme.length} caracteres
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Informações Adicionais */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-sm font-bold text-zinc-500">
+                3
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">
+                  Informações adicionais <span className="text-xs font-normal text-zinc-400">(opcional)</span>
+                </h3>
+                <p className="text-xs text-zinc-500">Preços, detalhes, promoções, etc.</p>
+              </div>
+            </div>
+            <div className="ml-10">
+              <textarea
+                value={extraInfo}
+                onChange={(event) => setExtraInfo(event.target.value)}
+                placeholder="Ex: O hambúrguer custa R$ 39,90 e vem com fritas..."
+                rows={2}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm transition focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+              />
+            </div>
+          </div>
+
+          {/* Card 3.5: Imagem de Inspiração */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
+                🎨
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">
+                  Imagem de inspiração <span className="text-xs font-normal text-zinc-400">(opcional)</span>
+                </h3>
+                <p className="text-xs text-zinc-500">Envie um post como exemplo para inspirar o design</p>
+              </div>
+            </div>
+            <div className="ml-10">
+              {!inspirationImage ? (
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-6 transition hover:border-orange-400 hover:bg-orange-50/30">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setInspirationImageFile(file);
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setInspirationImage(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <svg className="mb-2 h-8 w-8 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-zinc-600">Clique para fazer upload</span>
+                  <span className="mt-1 text-xs text-zinc-400">PNG, JPG ou WEBP até 10MB</span>
+                </label>
+              ) : (
+                <div className="relative">
+                  <div className="relative aspect-square w-full max-w-xs overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+                    <img
+                      src={inspirationImage}
+                      alt="Imagem de inspiração"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInspirationImage(null);
+                      setInspirationImageFile(null);
+                    }}
+                    className="mt-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50"
+                  >
+                    Remover imagem
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 3.5: Opções Avançadas */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-sm font-bold text-zinc-500">
+                  ⚙️
+                </div>
+                <div>
+                  <h3 className="font-semibold text-zinc-900">Opções avançadas</h3>
+                  <p className="text-xs text-zinc-500">Personalize ainda mais seu post</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-orange-200 hover:bg-orange-50"
+              >
+                {showAdvancedOptions ? "Ocultar" : "Mostrar"}
+              </button>
+            </div>
+            {showAdvancedOptions && (
+              <div className="ml-10 space-y-4">
+                {/* Texto Adicional */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-500">
+                    Texto adicional para a imagem
+                  </label>
+                  <textarea
+                    value={additionalText}
+                    onChange={(event) => setAdditionalText(event.target.value)}
+                    placeholder="Ex: Desconto de 20% válido até domingo..."
+                    rows={2}
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm transition focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  />
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Este texto aparecerá na imagem do post
+                  </p>
+                </div>
+
+                {/* Estilo da Imagem */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-500">
+                    Estilo visual da imagem
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "moderno", label: "Moderno", icon: "✨" },
+                      { value: "minimalista", label: "Minimalista", icon: "🎯" },
+                      { value: "colorido", label: "Colorido", icon: "🌈" },
+                      { value: "elegante", label: "Elegante", icon: "💎" },
+                      { value: "divertido", label: "Divertido", icon: "🎉" },
+                      { value: "profissional", label: "Profissional", icon: "💼" },
+                    ].map((style) => (
+                      <button
+                        key={style.value}
+                        type="button"
+                        onClick={() => setImageStyle(style.value)}
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                          imageStyle === style.value
+                            ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-200 hover:bg-orange-50/50"
+                        }`}
+                      >
+                        <span>{style.icon}</span>
+                        <span>{style.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Estilo do Texto */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-500">
+                    Estilo do texto
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "padrão", label: "Padrão", icon: "📝" },
+                      { value: "negrito", label: "Negrito", icon: "💪" },
+                      { value: "itálico", label: "Itálico", icon: "✍️" },
+                      { value: "maiúsculas", label: "Maiúsculas", icon: "🔤" },
+                      { value: "destaque", label: "Destaque", icon: "⭐" },
+                    ].map((style) => (
+                      <button
+                        key={style.value}
+                        type="button"
+                        onClick={() => setTextStyle(style.value)}
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                          textStyle === style.value
+                            ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-200 hover:bg-orange-50/50"
+                        }`}
+                      >
+                        <span>{style.icon}</span>
+                        <span>{style.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card 4: Paleta de Cores + Fontes */}
+          <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm font-bold text-orange-600">
+                🎨
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">Paleta de cores e fontes</h3>
+                <p className="text-xs text-zinc-500">Visual e tipografia do post</p>
+              </div>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2">
+              {/* Paleta */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-zinc-700">Cores</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPaletteOpen(true)}
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-orange-200 hover:bg-orange-50"
+                  >
+                    Alterar paleta
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-zinc-600">
+                    {selectedPalette < 0 ? "Personalizada" : paletteOptions[selectedPalette]?.name ?? "Personalizada"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {selectedPaletteColors.map((color, index) => (
+                      <label key={`${color}-${index}`} className="cursor-pointer group relative">
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={(e) => {
+                            // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
+                            if (selectedPalette >= 0) {
+                              const newPalette = [...selectedPaletteColors];
+                              newPalette[index] = e.target.value;
+                              setCustomPalette(newPalette);
+                              setSelectedPalette(-1);
+                            } else {
+                              // Se já for personalizada, apenas atualizar
+                              const newPalette = [...customPalette];
+                              newPalette[index] = e.target.value;
+                              setCustomPalette(newPalette);
+                            }
+                          }}
+                          className="h-8 w-8 cursor-pointer rounded-full border-2 border-white shadow-md transition-all hover:scale-110 hover:shadow-lg appearance-none overflow-hidden"
+                          style={{ backgroundColor: color }}
+                          title={`Clique para alterar a cor ${index + 1}`}
+                        />
+                        <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none">
+                          {color.toUpperCase()}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-zinc-400">
+                  💡 Clique nas cores para personalizar ou use "Alterar paleta" para escolher um conjunto pronto
+                </p>
+              </div>
+              {/* Fontes: Título e Texto */}
+              <div className="space-y-3">
+                <span className="text-sm font-semibold text-zinc-700">Fontes</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-500">Título</label>
+                    <select
+                      value={fontTitle}
+                      onChange={(e) => setFontTitle(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-200"
+                    >
+                      {TITLE_FONT_OPTIONS.map((f) => (
+                        <option key={f.value} value={f.value}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-500">Texto</label>
+                    <select
+                      value={fontText}
+                      onChange={(e) => setFontText(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-200"
+                    >
+                      {TEXT_FONT_OPTIONS.map((f) => (
+                        <option key={f.value} value={f.value}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* Preview das fontes ao selecionar */}
+                <div
+                  className="mt-4 rounded-xl border-2 border-zinc-200 bg-white p-4 shadow-sm"
+                  style={{
+                    backgroundColor: selectedPaletteColors[2] ? `${selectedPaletteColors[2]}08` : undefined,
+                    borderColor: selectedPaletteColors[0] ? `${selectedPaletteColors[0]}30` : undefined,
+                  }}
+                >
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+                  <p
+                    className="text-xl font-bold leading-tight"
+                    style={{
+                      fontFamily: fontTitle,
+                      color: selectedPaletteColors[0] || undefined,
+                    }}
+                  >
+                    Título de exemplo
+                  </p>
+                  <p
+                    className="mt-2 text-sm leading-relaxed text-zinc-600"
+                    style={{ fontFamily: fontText }}
+                  >
+                    Texto do post em corpo menor, fácil de ler.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botão de Gerar */}
+          <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-6">
+            {errorMessage && !isLoading && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-semibold text-red-600">{errorMessage}</p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isGenerating || !mainTheme.trim() || (objective === "Outro" && !customObjective.trim())}
+              className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-lg"
+            >
+              {isGenerating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Gerando seu post...
+                </span>
+              ) : (
+                "✨ Gerar Post para Instagram"
+              )}
+            </button>
+            {(!mainTheme.trim() || (objective === "Outro" && !customObjective.trim())) && (
+              <p className="mt-2 text-center text-xs text-zinc-400">
+                {!mainTheme.trim() && "⚠️ Preencha o tema central do post"}
+                {!mainTheme.trim() && (objective === "Outro" && !customObjective.trim()) && " e "}
+                {objective === "Outro" && !customObjective.trim() && "descreva o objetivo personalizado"}
+              </p>
+            )}
+          </div>
+
+          {/* Resultado Gerado */}
+          {generatedImage && (
+            <div className="mt-6 rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-6 shadow-lg">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-zinc-900">✨ Post gerado com sucesso!</h3>
+                  <p className="text-xs text-zinc-500">Seu post está pronto para publicar no Instagram</p>
+                </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setGeneratedImage(null);
+                  setGeneratedPost("");
+                  setMainTheme("");
+                  setExtraInfo("");
+                  setAdditionalText("");
+                  setInspirationImage(null);
+                  setInspirationImageFile(null);
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50"
+              >
+                Limpar e gerar novo
+              </button>
+              </div>
+              <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
+                <img
+                  src={generatedImage}
+                  alt="Post gerado para Instagram"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              {/* Legenda Gerada */}
+              {generatedPost && (
+                <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      📝 Legenda para Instagram
+                    </label>
+                    <button
+                      type="button"
+                      onClick={async (event) => {
+                        try {
+                          await navigator.clipboard.writeText(generatedPost);
+                          // Feedback visual melhorado
+                          const btn = event.currentTarget;
+                          const originalText = btn.textContent;
+                          btn.textContent = '✓ Copiado!';
+                          btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+                          setTimeout(() => {
+                            btn.textContent = originalText;
+                            btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+                          }, 2000);
+                        } catch (err) {
+                          alert('Erro ao copiar. Tente novamente.');
+                        }
+                      }}
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50"
+                    >
+                      Copiar legenda
+                    </button>
+                  </div>
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-700">
+                      {generatedPost}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = generatedImage;
+                    link.download = `post-instagram-${Date.now()}.png`;
+                    link.click();
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                >
+                  <span>💾</span>
+                  Baixar imagem
+                </button>
+                <button
+                  type="button"
+                  onClick={async (event) => {
+                    try {
+                      await navigator.clipboard.writeText(generatedImage);
+                      // Feedback visual melhorado
+                      const btn = event.currentTarget;
+                      const originalText = btn.innerHTML;
+                      btn.innerHTML = '<span>✓</span> Copiado!';
+                      btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+                      setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+                      }, 2000);
+                    } catch (err) {
+                      alert('Erro ao copiar. Tente novamente.');
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                >
+                  <span>📋</span>
+                  Copiar link
+                </button>
+              </div>
+            </div>
+          )}
+          </div>
+          </div>
+        </div>
+
+      </main>
+
+      {isPaletteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-display text-lg font-semibold text-zinc-900">
+                  Selecione uma paleta
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Escolha um conjunto de cores ou crie a sua própria paleta.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPaletteOpen(false)}
+                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {paletteOptions.map((palette, index) => (
+                <button
+                  key={palette.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPalette(index);
+                    setIsPaletteOpen(false); // Fechar automaticamente ao selecionar
+                  }}
+                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
+                    selectedPalette === index
+                      ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-200 hover:bg-orange-50/50"
+                  }`}
+                >
+                  <span>{palette.name}</span>
+                  <span className="flex items-center gap-1">
+                    {palette.colors.map((color) => (
+                      <span
+                        key={color}
+                        className="h-3 w-3 rounded-full border border-zinc-200"
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Crie a sua paleta
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {customPalette.map((color, index) => (
+                  <label
+                    key={`${color}-${index}`}
+                    className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600"
+                  >
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(event) => {
+                        const next = [...customPalette];
+                        next[index] = event.target.value;
+                        setCustomPalette(next);
+                        setSelectedPalette(-1);
+                      }}
+                      className="h-6 w-6 cursor-pointer rounded-full border border-zinc-200"
+                    />
+                    {color.toUpperCase()}
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPalette(-1);
+                  setIsPaletteOpen(false);
+                }}
+                className="mt-4 w-full rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+              >
+                Usar paleta personalizada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
