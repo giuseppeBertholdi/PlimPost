@@ -25,6 +25,24 @@ type OnboardingProfile = {
   brand_font_text?: string;
 };
 
+// Função auxiliar para fazer fetch com tratamento seguro de JSON
+async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get("content-type");
+  
+  if (contentType && contentType.includes("application/json")) {
+    return await response.json();
+  } else {
+    const text = await response.text();
+    console.error("Resposta não é JSON:", text.substring(0, 200));
+    throw new Error(
+      response.status === 404
+        ? "Rota da API não encontrada."
+        : `Erro no servidor (${response.status}).`
+    );
+  }
+}
+
 export default function HomePage() {
   const router = useRouter();
   
@@ -421,7 +439,23 @@ export default function HomePage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      // Verificar se a resposta é JSON antes de fazer o parse
+      const contentType = response.headers.get("content-type");
+      let data: any;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        // Se não for JSON, tentar ler como texto para debug
+        const text = await response.text();
+        console.error("Resposta não é JSON:", text.substring(0, 200));
+        throw new Error(
+          response.status === 404
+            ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
+            : `Erro no servidor (${response.status}). Tente novamente mais tarde.`
+        );
+      }
+
       if (!response.ok) {
         // Handle quota exceeded errors with retry information
         if (data?.quotaExceeded) {
@@ -467,8 +501,18 @@ export default function HomePage() {
         }
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro ao gerar o post.";
+      let message = "Erro ao gerar o post.";
+      
+      if (error instanceof Error) {
+        // Se for um erro de parsing JSON, dar uma mensagem mais clara
+        if (error.message.includes("JSON") || error.message.includes("Unexpected token")) {
+          message = "Erro de comunicação com o servidor. Verifique se a API está configurada corretamente.";
+        } else {
+          message = error.message;
+        }
+      }
+      
+      console.error("Erro ao gerar post:", error);
       setErrorMessage(message);
     } finally {
       setIsGenerating(false);
