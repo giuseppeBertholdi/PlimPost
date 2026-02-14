@@ -4,7 +4,7 @@ import GoogleLoginDirect from "@/components/GoogleLoginDirect";
 
 export default function Home() {
   return (
-    <div className="plimpost-dotted relative min-h-screen overflow-hidden bg-gradient-to-b from-orange-50 via-white to-white text-zinc-900">
+    <div className="plimpost-dotted relative min-h-screen overflow-hidden bg-gradient-to-b from-orange-50 via-white to-white text-zinc-900" style={{ backgroundColor: '#ffffff', colorScheme: 'light' }}>
       <AuthRedirectToHome />
       <div className="pointer-events-none absolute -top-32 right-0 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
       <div className="pointer-events-none absolute left-0 top-40 h-80 w-80 rounded-full bg-orange-100/60 blur-3xl" />

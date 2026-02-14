@@ -540,6 +540,36 @@ export default function HomePage() {
               <span className="hidden sm:inline">{credits ?? 0} {credits === 1 ? "crédito" : "créditos"}</span>
               <span className="sm:hidden">{credits ?? 0}</span>
             </a>
+            <details className="relative sm:hidden">
+              <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-2 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50">
+                Menu
+              </summary>
+              <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
+                <a
+                  href="/galeria"
+                  className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
+                >
+                  Galeria
+                </a>
+                <a
+                  href="/marca"
+                  className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
+                >
+                  Minha Marca
+                </a>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSignOut();
+                  }}
+                  className="block w-full rounded-xl px-3 py-2 text-left text-red-500 transition hover:bg-zinc-50"
+                >
+                  Sair
+                </button>
+              </div>
+            </details>
             <a
               href="/galeria"
               className="hidden rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:block sm:px-4 sm:py-2 sm:text-sm"
@@ -552,10 +582,9 @@ export default function HomePage() {
             >
               Minha Marca
             </a>
-            <details className="relative">
-            <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-2 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:px-3 sm:py-2 sm:text-sm">
-              <span className="hidden sm:inline">Perfil</span>
-              <span className="sm:hidden">⋯</span>
+            <details className="relative hidden sm:block">
+            <summary className="list-none cursor-pointer rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50">
+              Perfil
             </summary>
             <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
               <button
