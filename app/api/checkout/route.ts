@@ -5,14 +5,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
   apiVersion: "2024-12-18.acacia",
 });
 
+// ⚠️ PRODUÇÃO: Atualizar os price_id abaixo com os IDs de PRODUÇÃO do Stripe
+// Os IDs atuais são de TESTE. Crie produtos no Stripe Dashboard (modo Live) e substitua.
 const PRICE_MAP: Record<string, { priceId: string; credits: number; amount: number }> = {
   "1": {
-    priceId: "price_1T0hkLIPOqSQAIzU71sTiTUK",
+    priceId: process.env.STRIPE_PRICE_ID_1_CREDIT || "price_1T0hkLIPOqSQAIzU71sTiTUK", // ⚠️ Atualizar para produção
     credits: 1,
     amount: 399, // R$ 3,99 em centavos
   },
   "20": {
-    priceId: "price_1T0hoXIPOqSQAIzUvkZe5Qsl",
+    priceId: process.env.STRIPE_PRICE_ID_20_CREDITS || "price_1T0hoXIPOqSQAIzUvkZe5Qsl", // ⚠️ Atualizar para produção
     credits: 20,
     amount: 6999, // R$ 69,99 em centavos
   },
@@ -58,8 +60,8 @@ export async function POST(request: Request) {
         },
       ],
       mode: "payment",
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/creditos?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/creditos?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://plimpost.com"}/creditos?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://plimpost.com"}/creditos?canceled=true`,
       metadata: {
         userId,
         credits: packageInfo.credits.toString(),

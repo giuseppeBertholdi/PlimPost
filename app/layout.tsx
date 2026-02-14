@@ -14,10 +14,19 @@ const lato = Lato({
 });
 
 export const metadata: Metadata = {
-  title: "PlimPost",
-  description: "Gerador de posts para Instagram, Facebook e LinkedIn.",
+  title: "PlimPost - Gere posts profissionais para Instagram com IA",
+  description: "Crie imagens e legendas prontas para Instagram em segundos. Design profissional, texto autêntico e pronto para publicar.",
   icons: {
     icon: "/icon.svg",
+  },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://plimpost.com"),
+  openGraph: {
+    title: "PlimPost - Gere posts profissionais para Instagram",
+    description: "Crie imagens e legendas prontas para Instagram em segundos.",
+    url: "https://plimpost.com",
+    siteName: "PlimPost",
+    locale: "pt_BR",
+    type: "website",
   },
 };
 
