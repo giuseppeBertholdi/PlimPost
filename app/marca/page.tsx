@@ -295,7 +295,7 @@ export default function MarcaPage() {
         updated_at: new Date().toISOString(),
       };
 
-      let updateData = updateDataFull;
+      let updateData: typeof updateDataFull | (Omit<typeof updateDataFull, 'brand_font_title' | 'brand_font_text'> & { brand_font: string }) = updateDataFull;
       let { error } = await supabase
         .from("onboarding_profiles")
         .update(updateDataFull)
@@ -303,8 +303,8 @@ export default function MarcaPage() {
 
       if (error && (error.message.includes("brand_font_title") || error.message.includes("brand_font_text") || error.message.includes("does not exist"))) {
         const { brand_font_title: _t, brand_font_text: _b, ...updateDataFallback } = updateDataFull;
-        updateData = { ...updateDataFallback, brand_font: selectedFontTitle };
-        const res = await supabase.from("onboarding_profiles").update(updateData).eq("user_id", user.id);
+        updateData = { ...updateDataFallback, brand_font: selectedFontTitle } as typeof updateData;
+        const res = await supabase.from("onboarding_profiles").update(updateData as any).eq("user_id", user.id);
         error = res.error;
       }
 
