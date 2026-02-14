@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-// Inicializar Supabase Admin de forma lazy para evitar erros durante o build
-function getSupabaseAdmin(): SupabaseClient | null {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return null;
-  }
-  
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+// Cliente com service role key para operações server-side
+const supabaseAdmin = supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
 
 type OnboardingProfile = {
   business_name: string;
@@ -56,7 +53,6 @@ async function savePostToDb(
   postText: string,
   imageUrl: string | null
 ): Promise<void> {
-  const supabaseAdmin = getSupabaseAdmin();
   if (!payload.userId || !supabaseAdmin) {
     if (payload.userId && !supabaseAdmin) {
       console.warn(
@@ -413,7 +409,6 @@ export async function POST(request: Request) {
     }
 
     // Verificar e usar créditos
-    const supabaseAdmin = getSupabaseAdmin();
     if (!payload.userId || !supabaseAdmin) {
       return NextResponse.json(
         { error: "Usuário não identificado ou Supabase não configurado." },
@@ -637,7 +632,6 @@ export async function POST(request: Request) {
       let imageUrl: string | null = null;
       
       // Salvar imagem no Supabase Storage se houver userId
-      const supabaseAdmin = getSupabaseAdmin();
       if (imageBase64 && payload.userId && supabaseAdmin) {
         try {
           // Converter base64 para buffer
