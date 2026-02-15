@@ -88,60 +88,19 @@ const buildPrompt = (payload: GeneratePayload) => {
   const paletteName = payload.palette?.name ?? "Personalizada";
   const paletteColors = payload.palette?.colors?.join(", ") ?? "Não informado";
 
-  return `
-Você é um redator especialista em social media com talento para criar conteúdo autêntico, humano e envolvente. Seu objetivo é criar posts que soem como se fossem escritos por uma pessoa real, não por uma máquina.
+  return `Crie um post autêntico e humano para Instagram.
 
-SOBRE A MARCA:
-- Nome: ${payload.onboarding.business_name}
-- O que faz: ${payload.onboarding.business_description}
-- O que a torna especial: ${payload.onboarding.business_differential}
-- Tom de voz: ${tones}
-- Público-alvo: ${payload.onboarding.target_audience}
+MARCA: ${payload.onboarding.business_name} | ${payload.onboarding.business_description} | Diferencial: ${payload.onboarding.business_differential} | Tom: ${tones} | Público: ${payload.onboarding.target_audience}
 
-SOBRE ESTE POST:
-- Objetivo: ${payload.objective}
-- Tema principal: ${payload.mainTheme}
-${extra !== "Não informado" ? `- Informações adicionais: ${extra}` : ""}
+POST: Objetivo: ${payload.objective} | Tema: ${payload.mainTheme}${extra !== "Não informado" ? ` | Extra: ${extra}` : ""}
 
-DIRETRIZES PARA UM POST AUTÊNTICO E HUMANO:
-
-1. LINGUAGEM NATURAL:
-   - Escreva como uma pessoa real falaria, não como um robô
-   - Use contrações quando fizer sentido (ex: "você está" pode virar "você tá" se o tom permitir)
-   - Varie o tamanho das frases para criar ritmo
-   - Evite jargões corporativos e palavras muito formais
-
-2. CONEXÃO EMOCIONAL:
-   - Comece criando uma conexão com o leitor
-   - Use perguntas retóricas quando apropriado
-   - Mostre empatia e compreensão do público
-   - Seja genuíno e autêntico
-
-3. ESTRUTURA CONCISA:
-   - Abertura: Uma frase curta e impactante que captura atenção (máximo 1 linha)
-   - Desenvolvimento: 1-2 frases que desenvolvem o tema de forma direta e natural
-   - Destaque do diferencial: Integre o diferencial da marca de forma sutil em uma frase
-   - CTA: Uma chamada para ação curta e direta (máximo 1 linha)
-
-4. PERSONALIDADE:
-   - Adapte o tom exatamente ao perfil indicado (${tones})
-   - Se for "Amigável": use linguagem calorosa e acessível
-   - Se for "Profissional": mantenha credibilidade mas seja humano
-   - Se for "Divertido": permita-se ser leve e descontraído
-   - Se for "Inspirador": use linguagem motivacional mas genuína
-
-5. TÉCNICAS DE ESCRITA:
-   - Use quebras de linha estratégicas para facilitar leitura
-   - Crie ênfase com emojis sutis (máximo 2-3, apenas se fizer sentido)
-   - Varie entre frases curtas e médias
-   - Evite listas numeradas ou bullet points (a menos que seja essencial)
-
-6. ESPECIFICAÇÕES:
-   - Português do Brasil
-   - MÁXIMO 20-30 palavras (seja EXTREMAMENTE conciso)
-   - Foco em impacto visual, não em texto longo
-   - Apenas uma frase impactante ou duas frases muito curtas
-   - Sem hashtags no corpo do texto
+REGRAS:
+- Linguagem natural, como pessoa real falaria
+- MÁXIMO 20-30 palavras, extremamente conciso
+- Abertura impactante + desenvolvimento direto + CTA curta
+- Tom: ${tones}
+- Português do Brasil
+- Sem hashtags
    - ${extra !== "Não informado" ? "Mencione as informações adicionais de forma MUITO breve (1-2 palavras se possível)" : ""}
    - O texto deve ser visual e direto, não uma conversa longa
    - Priorize impacto visual sobre extensão de texto
@@ -252,135 +211,18 @@ const buildImagePrompt = (payload: GeneratePayload, postText: string) => {
   const titleText = lines[0] || fullText.split('.')[0] || fullText.substring(0, 50);
   const bodyText = lines.slice(1).join(' ') || fullText.substring(titleText.length).trim();
 
-  return `
-Crie uma imagem VISUALMENTE IMPACTANTE e PROFISSIONAL para post do Instagram. A IMAGEM É O FOCO PRINCIPAL, o texto é apenas complemento.
+  return `Crie imagem 1080x1080px para Instagram. 70% visual, 30% texto.
 
-ESPECIFICAÇÕES TÉCNICAS OBRIGATÓRIAS:
-- Tamanho: EXATAMENTE 1080x1080 pixels (formato quadrado 1:1)
-- Resolução: ALTA QUALIDADE, nítida e clara
-- Formato: PNG com fundo
-- Qualidade: pronta para publicação profissional
-- NÃO inclua swatches de cores, códigos hexadecimais ou paletas visíveis na imagem
-- NÃO mostre códigos de cores no topo ou em qualquer lugar da imagem
-- NÃO inclua nomes de fontes na imagem (como "Open Sans", "Montserrat", etc.)
-- NÃO mencione ou mostre informações técnicas sobre fontes ou tipografia na imagem
-- APENAS USE as fontes e cores, mas NUNCA as mencione textualmente na imagem
-
-SOBRE A MARCA:
-- Nome: ${payload.onboarding.business_name}
-- Descrição: ${payload.onboarding.business_description}
-- Diferencial: ${payload.onboarding.business_differential}
-- Tom de voz: ${tones}
-${logoUrl ? `
-LOGO DA MARCA (CRÍTICO - SIGA EXATAMENTE):
-Uma logo da marca foi fornecida como imagem de referência. REGRAS ABSOLUTAS E OBRIGATÓRIAS:
-- Use a logo EXATAMENTE como está na imagem fornecida, SEM NENHUMA MODIFICAÇÃO
-- NÃO redesenhe, NÃO adapte, NÃO modifique a logo de forma alguma
-- NÃO altere cores, formas, proporções ou qualquer elemento da logo
-- NÃO adicione efeitos, sombras, bordas ou transformações à logo
-- NÃO recrie ou reinterprete a logo
-- Use a logo ORIGINAL e IDÊNTICA, pixel a pixel, como aparece na imagem fornecida
-- A logo deve aparecer na imagem gerada EXATAMENTE como está no arquivo original
-- Se a logo tiver fundo transparente, mantenha o fundo transparente
-- Se a logo tiver cores específicas, mantenha essas cores exatas
-- A única coisa permitida é ajustar o TAMANHO/ESCALA da logo para caber harmoniosamente no design, mas SEMPRE mantendo todas as proporções, cores e elementos originais intactos
-- Copie a logo da imagem fornecida e coloque na imagem gerada, mantendo-a idêntica
-
-IMPORTANTE: A logo é um elemento sagrado da identidade visual da marca. Ela DEVE aparecer na imagem gerada EXATAMENTE como foi fornecida, sem qualquer alteração visual, de cor, forma, estilo ou elemento. Use a logo da imagem de referência como modelo e replique-a identicamente na imagem gerada.
-
-` : ''}
-PALETA DE CORES: ${paletteName}
-Cores principais: ${paletteColors}
-Use essas cores como base, crie variações e gradientes harmoniosos. 
-REGRA CRÍTICA: APENAS USE AS CORES NA IMAGEM, MAS NUNCA MOSTRE:
-- Códigos hexadecimais (#f97316, etc.)
-- Swatches ou paletas de cores
-- Nomes de cores
-- Qualquer referência textual às cores
-
-ESTILO VISUAL: ${imageStyleDesc}
-
-INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (SIGA EXATAMENTE):
-${mainTheme ? `TEMA CENTRAL DO POST:
-"${mainTheme}"
-
-IMPORTANTE: A imagem DEVE representar visualmente este tema. Se o usuário mencionou pessoas, adicione pessoas. Se mencionou produtos, mostre produtos. Se mencionou um estilo específico, aplique esse estilo. Siga EXATAMENTE o que foi solicitado.
-
-` : ''}${extraInfo ? `INFORMAÇÕES ADICIONAIS IMPORTANTES:
-"${extraInfo}"
-
-IMPORTANTE: Estas informações são CRÍTICAS e DEVEM ser representadas na imagem quando aplicável. Se mencionar preços, promoções, detalhes específicos, elementos visuais específicos, etc., INCLUA na imagem.
-
-` : ''}
-
-${payload.inspirationImage ? `IMAGEM DE INSPIRAÇÃO:
-Uma imagem de exemplo foi fornecida como referência. Use esta imagem como inspiração para:
-- Composição e layout similar
-- Estilo visual e estética
-- Elementos gráficos e disposição
-- Tom e atmosfera geral
-Adapte e personalize para a marca e conteúdo específico deste post, mantendo a essência visual da imagem de inspiração mas aplicando as cores, fontes e elementos da marca.
-
-` : ''}TEXTO NA IMAGEM (MÍNIMO POSSÍVEL):
-TÍTULO PRINCIPAL (máximo 3-5 palavras, grande e destacado):
-"${titleText}"
-
-${bodyText ? `TEXTO SECUNDÁRIO (máximo 1 linha, pequeno e discreto):
-"${bodyText}"` : ''}
-
-REGRAS CRÍTICAS DE DESIGN VISUAL:
-
-1. PRIORIDADE: ELEMENTOS VISUAIS > TEXTO
-   - A imagem deve ser 70% visual e 30% texto
-   - Use elementos gráficos, formas, ícones, ilustrações que representem o negócio
-   - O texto deve ocupar NO MÁXIMO 30% da imagem
-   - Espaço em branco generoso ao redor do texto
-
-2. COMPOSIÇÃO VISUAL FORTE:
-   - Layout com elementos visuais em destaque (formas, gradientes, padrões, ilustrações)
-   - Hierarquia: Elementos visuais > Título > Texto secundário
-   - Use elementos gráficos que representem o tipo de negócio (ex: comida = ícones de comida, tecnologia = formas geométricas modernas)
-   - Fundo rico visualmente, não apenas cor sólida
-
-3. TIPOGRAFIA (TEXTO MÍNIMO):
-   - TÍTULO: ${descTitle}. Tamanho GRANDE mas não dominante. Máximo 3-5 palavras. Estilo: ${textStyleDesc}
-   - TEXTO SECUNDÁRIO: ${descText}. Tamanho PEQUENO e discreto. Máximo 1 linha ou omita se não couber bem.
-   - O texto NÃO deve dominar a imagem - é complemento visual
-   - PROIBIDO: NÃO inclua nomes de fontes na imagem (ex: "Open Sans", "Montserrat", etc.)
-   - PROIBIDO: NÃO mencione informações sobre tipografia ou fontes na imagem
-   - APENAS USE a fonte visualmente, mas NUNCA a mencione textualmente
-
-4. CORES E ELEMENTOS VISUAIS:
-   - Use a paleta fornecida criando gradientes, formas coloridas, padrões
-   - Adicione elementos gráficos: formas geométricas, linhas, padrões, ícones, ilustrações sutis
-   - Fundo visualmente interessante, não apenas cor plana
-   - Elementos que representem o negócio de forma visual
-
-5. ESTILO: ${imageStyleDesc}
-   - Aplique consistentemente este estilo em todos os elementos
-   - Visual atraente que chame atenção no feed
-   - Profissional mas acessível
-   - Alinhado com tom: ${tones}
-
-6. QUALIDADE FINAL:
-   - Imagem COMPLETA e FINALIZADA
-   - ALTA QUALIDADE visual
-   - Texto legível mas NÃO dominante
-   - Balance: 70% visual / 30% texto
-
-PROIBIÇÕES ABSOLUTAS NA IMAGEM:
-- NUNCA inclua nomes de fontes (ex: "Open Sans", "Montserrat", "Roboto", etc.)
-- NUNCA mostre códigos de cores (ex: #f97316, #ff0000, etc.)
-- NUNCA mostre swatches, paletas ou referências a cores
-- NUNCA mencione informações técnicas sobre tipografia ou design
-- NUNCA inclua sites, URLs ou endereços web fictícios ou inventados
-- NUNCA inclua menções (@) ou perfis de redes sociais inventados
-- NUNCA crie informações de contato falsas (emails, telefones, etc.)
-- NUNCA adicione elementos fictícios que não foram explicitamente solicitados pelo usuário
-- A imagem deve conter APENAS o conteúdo visual do post, sem metadados ou informações técnicas
-- APENAS inclua sites, @, URLs ou informações de contato se o usuário EXPLICITAMENTE solicitar no tema central ou informações adicionais
-
-IMPORTANTE: Siga EXATAMENTE estas regras. A imagem deve ser PRIMARIAMENTE VISUAL. O texto é complemento, não o foco. Use elementos gráficos, formas, padrões, gradientes. Gere com EXATAMENTE 1080x1080 pixels, alta qualidade. A imagem final deve ser limpa, profissional e pronta para publicação, SEM qualquer referência a fontes, cores ou elementos técnicos. NÃO invente informações de contato, sites ou perfis - apenas use se o usuário pedir explicitamente.
+MARCA: ${payload.onboarding.business_name} | ${payload.onboarding.business_description} | Diferencial: ${payload.onboarding.business_differential} | Tom: ${tones}
+${logoUrl ? `LOGO: Use a logo fornecida EXATAMENTE como está, sem modificações. Apenas ajuste tamanho mantendo proporções.` : ''}
+CORES: ${paletteColors} - Use como base, crie gradientes. NUNCA mostre códigos hex ou swatches.
+ESTILO: ${imageStyleDesc}
+${mainTheme ? `TEMA: "${mainTheme}" - Represente visualmente.` : ''}${extraInfo ? `EXTRA: "${extraInfo}" - Inclua na imagem.` : ''}
+${payload.inspirationImage ? `INSPIRAÇÃO: Use a imagem fornecida como referência de composição e estilo.` : ''}
+TEXTO: TÍTULO "${titleText}" (${descTitle}, grande, 3-5 palavras, ${textStyleDesc})${bodyText ? ` | CORPO "${bodyText}" (${descText}, pequeno, 1 linha)` : ''}
+REGRAS: 70% elementos visuais (formas, gradientes, padrões, ícones) + 30% texto. Fundo rico visualmente. NUNCA mencione nomes de fontes ou códigos de cores na imagem. Apenas USE visualmente.
+PROIBIDO: Nomes de fontes, códigos hex, swatches, informações técnicas, sites/URLs/perfis inventados.
+QUALIDADE: 1080x1080px, alta qualidade, PNG, pronto para publicação.
 `.trim();
 };
 

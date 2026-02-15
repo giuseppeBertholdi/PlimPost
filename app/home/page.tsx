@@ -541,10 +541,10 @@ export default function HomePage() {
     let inspirationImageBase64: string | undefined = undefined;
     if (inspirationImageFile) {
       try {
-        // Limitar tamanho da imagem (2MB)
-        const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+        // Limitar tamanho da imagem (1MB antes da compressão)
+        const MAX_IMAGE_SIZE = 1 * 1024 * 1024; // 1MB
         if (inspirationImageFile.size > MAX_IMAGE_SIZE) {
-          setErrorMessage("A imagem de inspiração é muito grande. Use uma imagem menor que 2MB ou remova a imagem.");
+          setErrorMessage("A imagem de inspiração é muito grande. Use uma imagem menor que 1MB ou remova a imagem.");
           setIsGenerating(false);
           isGeneratingRef.current = false;
           return;
@@ -555,8 +555,8 @@ export default function HomePage() {
           type: inspirationImageFile.type
         });
 
-        // Comprimir a imagem antes de converter para base64
-        const compressedImage = await compressImage(inspirationImageFile, 1024, 0.8);
+        // Comprimir a imagem antes de converter para base64 (800px, qualidade 0.7 para reduzir tamanho)
+        const compressedImage = await compressImage(inspirationImageFile, 800, 0.7);
         
         console.log("✅ Imagem comprimida:", {
           originalSize: inspirationImageFile.size,
@@ -587,11 +587,21 @@ export default function HomePage() {
       }
     }
 
-    const payload = {
-      onboarding,
+    // Criar payload otimizado - apenas campos necessários do onboarding
+    const optimizedOnboarding = {
+      business_name: onboarding.business_name,
+      business_description: onboarding.business_description,
+      business_differential: onboarding.business_differential,
+      tone_tags: onboarding.tone_tags,
+      target_audience: onboarding.target_audience,
+    };
+
+    // Construir payload removendo campos undefined e otimizando
+    const payload: any = {
+      onboarding: optimizedOnboarding,
       objective: finalObjective,
       mainTheme: mainTheme.trim(),
-      extraInfo: extraInfo.trim(),
+      extraInfo: extraInfo.trim() || undefined,
       palette: {
         name:
           selectedPalette < 0
@@ -601,12 +611,18 @@ export default function HomePage() {
       },
       fontTitle: DEFAULT_FONT_TITLE,
       fontText: DEFAULT_FONT_TEXT,
-      additionalText: additionalText.trim() || undefined,
       imageStyle: imageStyle,
       textStyle: textStyle,
       userId: currentUserId,
-      inspirationImage: inspirationImageBase64,
     };
+
+    // Adicionar campos opcionais apenas se tiverem valor
+    if (additionalText.trim()) {
+      payload.additionalText = additionalText.trim();
+    }
+    if (inspirationImageBase64) {
+      payload.inspirationImage = inspirationImageBase64;
+    }
 
     try {
       console.log("🚀 Iniciando geração de post...", { 
