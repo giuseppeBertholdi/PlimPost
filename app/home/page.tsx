@@ -527,8 +527,13 @@ export default function HomePage() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-6">
           <a
             href="/home"
-            className="font-display text-base font-semibold text-zinc-900 sm:text-lg"
+            className="flex items-center gap-2 font-display text-base font-semibold text-zinc-900 sm:text-lg"
           >
+            <img 
+              src="/icon.svg" 
+              alt="PlimPost" 
+              className="h-6 w-6 sm:h-7 sm:w-7"
+            />
             PlimPost
           </a>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -622,6 +627,38 @@ export default function HomePage() {
           <p className="mt-2 text-xs text-zinc-600 sm:text-sm md:text-base">
             Crie posts profissionais para suas redes sociais em segundos
           </p>
+          
+          {/* Banner de créditos destacado */}
+          <div className="mt-6 mx-auto max-w-2xl">
+            <a
+              href="/creditos"
+              className="group block rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 via-white to-orange-50/30 p-4 shadow-lg transition hover:border-orange-400 hover:shadow-xl sm:p-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-2xl shadow-md sm:h-14 sm:w-14 sm:text-3xl">
+                    💎
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-zinc-700 sm:text-base">
+                      Você tem <span className="text-orange-600 font-bold">{credits ?? 0}</span> {credits === 1 ? "crédito" : "créditos"}
+                    </p>
+                    <p className="text-xs text-zinc-500 sm:text-sm">
+                      {credits && credits > 0 ? "Continue gerando posts incríveis!" : "Compre créditos para começar a gerar posts"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-semibold text-orange-600 group-hover:text-orange-700 sm:text-sm">
+                    Comprar →
+                  </span>
+                  <span className="text-xs text-zinc-400 sm:text-sm">
+                    R$ 3,99
+                  </span>
+                </div>
+              </div>
+            </a>
+          </div>
         </div>
 
         <div className="space-y-4 sm:space-y-6">
@@ -979,8 +1016,23 @@ export default function HomePage() {
           {/* Botão de Gerar */}
           <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-4 sm:p-6">
             {errorMessage && !isLoading && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
-                <p className="text-sm font-semibold text-red-600">{errorMessage}</p>
+              <div className="mb-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-white p-4 shadow-md">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-xl text-white">
+                    ⚠
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-800 sm:text-base">{errorMessage}</p>
+                    {errorMessage.includes("Créditos insuficientes") && (
+                      <a
+                        href="/creditos"
+                        className="mt-3 inline-block rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl"
+                      >
+                        💎 Comprar Créditos Agora
+                      </a>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
             <button
@@ -1131,94 +1183,140 @@ export default function HomePage() {
       </main>
 
       {isPaletteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 sm:px-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsPaletteOpen(false);
+            }
+          }}
+        >
+          <div 
+            className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-6">
               <div>
-                <h3 className="font-display text-lg font-semibold text-zinc-900">
+                <h3 className="font-display text-xl font-semibold text-zinc-900 sm:text-2xl">
                   Selecione uma paleta
                 </h3>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-2 text-sm text-zinc-500">
                   Escolha um conjunto de cores ou crie a sua própria paleta.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPaletteOpen(false)}
-                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600"
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50 hover:border-zinc-300"
               >
-                Fechar
+                ✕
               </button>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {paletteOptions.map((palette, index) => (
-                <button
-                  key={palette.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPalette(index);
-                    setIsPaletteOpen(false); // Fechar automaticamente ao selecionar
-                  }}
-                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
-                    selectedPalette === index
-                      ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-200 hover:bg-orange-50/50"
-                  }`}
-                >
-                  <span>{palette.name}</span>
-                  <span className="flex items-center gap-1">
-                    {palette.colors.map((color) => (
-                      <span
-                        key={color}
-                        className="h-3 w-3 rounded-full border border-zinc-200"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                </button>
-              ))}
+            <div className="mb-6">
+              <p className="mb-3 text-sm font-semibold text-zinc-700">Paletas pré-definidas</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {paletteOptions.map((palette, index) => (
+                  <button
+                    key={palette.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPalette(index);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                      selectedPalette === index
+                        ? "border-orange-400 bg-orange-50 text-orange-700 shadow-md scale-[1.02]"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-300 hover:bg-orange-50/30 hover:shadow-sm"
+                    }`}
+                  >
+                    <span className="font-medium">{palette.name}</span>
+                    <span className="flex items-center gap-1.5">
+                      {palette.colors.map((color) => (
+                        <span
+                          key={color}
+                          className="h-4 w-4 rounded-full border-2 border-white shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Crie a sua paleta
+            <div className="rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-5 sm:p-6">
+              <p className="mb-4 text-sm font-semibold text-zinc-700">
+                ✨ Crie a sua paleta personalizada
               </p>
-              <div className="mt-3 flex flex-wrap gap-3">
+              <div className="mb-4 flex flex-wrap gap-3">
                 {customPalette.map((color, index) => (
                   <label
                     key={`${color}-${index}`}
-                    className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600"
+                    className="group flex items-center gap-3 rounded-xl border-2 border-zinc-200 bg-white px-4 py-3 text-xs font-semibold text-zinc-600 transition hover:border-orange-300 hover:shadow-md cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="color"
                       value={color}
                       onChange={(event) => {
+                        event.stopPropagation();
                         const next = [...customPalette];
                         next[index] = event.target.value;
                         setCustomPalette(next);
                         setSelectedPalette(-1);
                       }}
-                      className="h-6 w-6 cursor-pointer rounded-full border border-zinc-200"
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8 cursor-pointer rounded-lg border-2 border-zinc-200 shadow-sm transition hover:scale-110"
                     />
-                    {color.toUpperCase()}
+                    <span className="font-mono text-xs">{color.toUpperCase()}</span>
                   </label>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPalette(-1);
-                  setIsPaletteOpen(false);
-                }}
-                className="mt-4 w-full rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
-              >
-                Usar paleta personalizada
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPalette(-1);
+                    setIsPaletteOpen(false);
+                  }}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl"
+                >
+                  Usar paleta personalizada
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPaletteOpen(false)}
+                  className="rounded-xl border-2 border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50 hover:border-zinc-300"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <footer className="border-t border-zinc-200 bg-white mt-12">
+        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-base font-semibold text-zinc-900 sm:text-lg">PlimPost</div>
+              <p className="mt-1 text-xs text-zinc-500 sm:text-sm">
+                Gerador de posts profissionais para redes sociais
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 sm:gap-4 sm:text-sm">
+              <a href="/politica-privacidade" className="hover:text-zinc-600 transition">
+                Política de Privacidade
+              </a>
+              <span className="text-zinc-300">•</span>
+              <a href="/termos-uso" className="hover:text-zinc-600 transition">
+                Termos de Uso
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

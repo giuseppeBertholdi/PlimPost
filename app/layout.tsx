@@ -17,7 +17,10 @@ export const metadata: Metadata = {
   title: "PlimPost - Gere posts profissionais para Instagram com IA",
   description: "Crie imagens e legendas prontas para Instagram em segundos. Design profissional, texto autêntico e pronto para publicar.",
   icons: {
-    icon: "/icon.svg",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
+    ],
   },
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://plimpost.com"),
   openGraph: {

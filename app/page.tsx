@@ -23,7 +23,7 @@ export default function Home() {
           <a href="#precos" className="hover:text-zinc-900">
             Preços
           </a>
-          <a href="mailto:contato@plimpost.com" className="hover:text-zinc-900">
+          <a href="mailto:giuseppe.bertholdi@gmail.com" className="hover:text-zinc-900">
             Contato
           </a>
         </nav>
@@ -272,7 +272,9 @@ export default function Home() {
                 <li>Suporte prioritário</li>
               </ul>
               <a
-                href="mailto:contato@plimpost.com"
+                href="https://wa.me/5547992231586?text=Quero%20conversar%20sobre%20o%20plano%20enterprise"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
               >
                 Falar com vendas
@@ -294,7 +296,9 @@ export default function Home() {
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <GoogleLoginDirect className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" />
               <a
-                href="mailto:contato@plimpost.com"
+                href="https://wa.me/5547992231586?text=Quero%20conversar%20sobre%20o%20plano%20enterprise"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-full border border-orange-200 px-6 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
               >
                 Falar com a equipe
@@ -305,23 +309,36 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-orange-100 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-lg font-semibold">PlimPost</div>
-            <p className="mt-2 text-sm text-zinc-500">
-              Gerador de posts para Instagram, Facebook e LinkedIn.
-            </p>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-zinc-500">
-            <a href="#recursos" className="hover:text-zinc-900">
-              Recursos
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-lg font-semibold">PlimPost</div>
+              <p className="mt-2 text-sm text-zinc-500">
+                Gerador de posts para Instagram, Facebook e LinkedIn.
+              </p>
+            </div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500">
+                <a href="#recursos" className="hover:text-zinc-900">
+                  Recursos
+                </a>
+                <a href="#precos" className="hover:text-zinc-900">
+                  Preços
+                </a>
+            <a href="mailto:giuseppe.bertholdi@gmail.com" className="hover:text-zinc-900">
+              Contato
             </a>
-            <a href="#precos" className="hover:text-zinc-900">
-              Preços
-            </a>
-            <a href="mailto:contato@plimpost.com" className="hover:text-zinc-900">
-              contato@plimpost.com
-            </a>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 sm:text-sm">
+                <a href="/politica-privacidade" className="hover:text-zinc-600">
+                  Política de Privacidade
+                </a>
+                <span className="text-zinc-300">•</span>
+                <a href="/termos-uso" className="hover:text-zinc-600">
+                  Termos de Uso
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </footer>

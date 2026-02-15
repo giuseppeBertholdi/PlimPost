@@ -534,27 +534,6 @@ export default function MarcaPage() {
                         </>
                       )}
                     </div>
-                    {(onboarding?.brand_font_title || onboarding?.brand_font_text || onboarding?.brand_font) && (
-                      <div className="space-y-2">
-                        <span className="text-sm text-zinc-600">Fontes: </span>
-                        <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-2">
-                          <p className="text-xs text-zinc-500">Título</p>
-                          <p
-                            className="text-base font-semibold text-zinc-900"
-                            style={{ fontFamily: onboarding.brand_font_title || onboarding.brand_font }}
-                          >
-                            {onboarding.business_name}
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-2">Texto</p>
-                          <p
-                            className="text-sm text-zinc-700"
-                            style={{ fontFamily: onboarding.brand_font_text || onboarding.brand_font }}
-                          >
-                            Preview do corpo do post
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -712,87 +691,114 @@ export default function MarcaPage() {
       </main>
 
       {isPaletteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 sm:px-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsPaletteOpen(false);
+            }
+          }}
+        >
+          <div 
+            className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-6">
               <div>
-                <h3 className="font-display text-lg font-semibold text-zinc-900">
+                <h3 className="font-display text-xl font-semibold text-zinc-900 sm:text-2xl">
                   Selecione uma paleta
                 </h3>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-2 text-sm text-zinc-500">
                   Escolha um conjunto de cores ou crie a sua própria paleta.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPaletteOpen(false)}
-                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600"
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50 hover:border-zinc-300"
               >
-                Fechar
+                ✕
               </button>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {paletteOptions.map((palette, index) => (
-                <button
-                  key={palette.name}
-                  type="button"
-                  onClick={() => setSelectedPalette(index)}
-                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
-                    selectedPalette === index
-                      ? "border-orange-300 bg-orange-50 text-orange-700"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                  }`}
-                >
-                  <span>{palette.name}</span>
-                  <span className="flex items-center gap-1">
-                    {palette.colors.map((color) => (
-                      <span
-                        key={color}
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                </button>
-              ))}
+            <div className="mb-6">
+              <p className="mb-3 text-sm font-semibold text-zinc-700">Paletas pré-definidas</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {paletteOptions.map((palette, index) => (
+                  <button
+                    key={palette.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPalette(index);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                      selectedPalette === index
+                        ? "border-orange-400 bg-orange-50 text-orange-700 shadow-md scale-[1.02]"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-300 hover:bg-orange-50/30 hover:shadow-sm"
+                    }`}
+                  >
+                    <span className="font-medium">{palette.name}</span>
+                    <span className="flex items-center gap-1.5">
+                      {palette.colors.map((color) => (
+                        <span
+                          key={color}
+                          className="h-4 w-4 rounded-full border-2 border-white shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Crie a sua paleta
+            <div className="rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-5 sm:p-6">
+              <p className="mb-4 text-sm font-semibold text-zinc-700">
+                ✨ Crie a sua paleta personalizada
               </p>
-              <div className="mt-3 flex flex-wrap gap-3">
+              <div className="mb-4 flex flex-wrap gap-3">
                 {customPalette.map((color, index) => (
                   <label
                     key={`${color}-${index}`}
-                    className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600"
+                    className="group flex items-center gap-3 rounded-xl border-2 border-zinc-200 bg-white px-4 py-3 text-xs font-semibold text-zinc-600 transition hover:border-orange-300 hover:shadow-md cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="color"
                       value={color}
                       onChange={(event) => {
+                        event.stopPropagation();
                         const next = [...customPalette];
                         next[index] = event.target.value;
                         setCustomPalette(next);
                         setSelectedPalette(-1);
                       }}
-                      className="h-6 w-6 cursor-pointer rounded-full border border-zinc-200"
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8 cursor-pointer rounded-lg border-2 border-zinc-200 shadow-sm transition hover:scale-110"
                     />
-                    {color.toUpperCase()}
+                    <span className="font-mono text-xs">{color.toUpperCase()}</span>
                   </label>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPalette(-1);
-                  setIsPaletteOpen(false);
-                }}
-                className="mt-4 rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
-              >
-                Usar esta paleta
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPalette(-1);
+                    setIsPaletteOpen(false);
+                  }}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl"
+                >
+                  Usar esta paleta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPaletteOpen(false)}
+                  className="rounded-xl border-2 border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50 hover:border-zinc-300"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>
