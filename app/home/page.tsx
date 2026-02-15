@@ -105,6 +105,7 @@ export default function HomePage() {
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   
   // Estado de créditos
   const [credits, setCredits] = useState<number | null>(null);
@@ -493,6 +494,7 @@ export default function HomePage() {
 
   const handleGenerate = async () => {
     setErrorMessage(null);
+    setImageError(null);
     setGeneratedPost("");
     setGeneratedImage(null);
     setShowChat(false);
@@ -730,9 +732,17 @@ export default function HomePage() {
       // Usar imageUrl se disponível (imagem salva), senão usar base64
       setGeneratedImage(data.imageUrl ?? data.image ?? null);
       
+      // Processar erro de imagem se houver
+      if (data.imageError) {
+        setImageError(data.imageError);
+      } else {
+        setImageError(null);
+      }
+      
       console.log("✅ Estados atualizados:", { 
         generatedPost: !!data.post, 
-        generatedImage: !!(data.imageUrl || data.image) 
+        generatedImage: !!(data.imageUrl || data.image),
+        imageError: data.imageError || null
       });
       
       // Inicializar chat com mensagem de boas-vindas
@@ -1397,6 +1407,7 @@ export default function HomePage() {
                 onClick={() => {
                   setGeneratedImage(null);
                   setGeneratedPost("");
+                  setImageError(null);
                   setMainTheme("");
                   setExtraInfo("");
                   setAdditionalText("");
@@ -1425,7 +1436,14 @@ export default function HomePage() {
                 </div>
               ) : generatedPost ? (
                 <div className="mx-auto rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-6 text-center">
-                  <p className="text-sm text-orange-700">⚠️ A imagem não pôde ser gerada, mas o texto foi criado com sucesso.</p>
+                  <p className="text-sm text-orange-700">
+                    {imageError || "⚠️ A imagem não pôde ser gerada, mas o texto foi criado com sucesso."}
+                  </p>
+                  {imageError && imageError.includes("Limite de requisições") && (
+                    <p className="mt-2 text-xs text-orange-600">
+                      💡 Dica: O limite de requisições do Gemini foi atingido. Isso acontece quando há muitas requisições em um curto período. Tente novamente em alguns minutos.
+                    </p>
+                  )}
                 </div>
               ) : null}
               {/* Legenda Gerada */}

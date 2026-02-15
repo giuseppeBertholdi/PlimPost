@@ -512,7 +512,13 @@ export async function POST(request: Request) {
         errorMessage.includes("quota") || 
         errorMessage.includes("Quota exceeded") ||
         errorMessage.includes("rate limit") ||
-        textResponse.status === 429;
+        errorMessage.includes("RESOURCE_EXHAUSTED") ||
+        errorMessage.includes("resource exhausted") ||
+        errorMessage.includes("limit") ||
+        errorData?.error?.code === 429 ||
+        errorData?.error?.status === "RESOURCE_EXHAUSTED" ||
+        textResponse.status === 429 ||
+        textResponse.status === 403;
       
       if (isQuotaExceeded) {
         // Try to extract retry time from error message
@@ -644,8 +650,38 @@ export async function POST(request: Request) {
         
         const errorData = await imageResponse.json().catch(() => ({}));
         console.error("Gemini Image API error:", imageResponse.status, errorData);
+        
+        const errorMessage = errorData?.error?.message || `Erro na API do Gemini: ${imageResponse.status}`;
+        
+        // Verificar se é erro de quota/limite
+        const isQuotaExceeded = 
+          errorMessage.includes("quota") || 
+          errorMessage.includes("Quota exceeded") ||
+          errorMessage.includes("rate limit") ||
+          errorMessage.includes("RESOURCE_EXHAUSTED") ||
+          errorMessage.includes("resource exhausted") ||
+          errorMessage.includes("limit") ||
+          imageResponse.status === 429 ||
+          imageResponse.status === 403;
+        
         // Salvar post (só texto) na galeria mesmo quando a imagem falha
         await savePostToDb(payload, postText, null);
+        
+        if (isQuotaExceeded) {
+          // Try to extract retry time from error message
+          const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i) || 
+                            errorMessage.match(/retry in ([\d.]+) seconds/i) ||
+                            errorMessage.match(/retry after ([\d.]+)s/i);
+          const retrySeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
+          
+          return NextResponse.json({
+            post: postText,
+            imageError: `⚠️ Limite de requisições do Gemini atingido. A imagem não pôde ser gerada, mas o texto foi criado com sucesso.${retrySeconds ? ` Tente novamente em ${Math.ceil(retrySeconds)} segundos.` : ' Tente novamente em alguns minutos.'}`,
+            quotaExceeded: true,
+            retryAfter: retrySeconds,
+          });
+        }
+        
         return NextResponse.json({
           post: postText,
           imageError: "Falha ao gerar a imagem, mas o texto foi gerado com sucesso.",
