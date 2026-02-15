@@ -464,9 +464,9 @@ export async function POST(request: Request) {
     // Primeiro, gerar o texto do post
     const prompt = buildPrompt(payload);
 
-    // Timeout de 25 segundos para a requisição de texto (deixar margem para o timeout do Netlify)
+    // Timeout de 18 segundos para a requisição de texto (Netlify tem timeout de 10s, mas com edge functions pode ser maior)
     const textController = new AbortController();
-    const textTimeout = setTimeout(() => textController.abort(), 25000);
+    const textTimeout = setTimeout(() => textController.abort(), 18000);
 
     const textResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
@@ -605,9 +605,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 25 segundos para a requisição de imagem
+      // Timeout de 18 segundos para a requisição de imagem
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 25000);
+      const imageTimeout = setTimeout(() => imageController.abort(), 18000);
 
       const imageResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
@@ -741,9 +741,9 @@ IMPORTANTE: Gere uma legenda COMPLETA e DESENVOLVIDA. Não seja breve demais. A 
 Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 `.trim();
 
-          // Timeout de 20 segundos para a requisição de legenda
+          // Timeout de 15 segundos para a requisição de legenda
           const captionController = new AbortController();
-          const captionTimeout = setTimeout(() => captionController.abort(), 20000);
+          const captionTimeout = setTimeout(() => captionController.abort(), 15000);
 
           const captionResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
@@ -813,14 +813,27 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
     console.error("Generate API error:", error);
     
     // Verificar se foi timeout ou abort
-    if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
-      return NextResponse.json(
-        {
-          error: "A requisição demorou muito para ser processada. Tente novamente com uma imagem mais simples ou sem imagem de inspiração.",
-          timeout: true,
-        },
-        { status: 504 }
-      );
+    if (error instanceof Error) {
+      if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          {
+            error: "A requisição demorou muito para ser processada. O servidor tem um limite de tempo. Tente novamente com uma imagem mais simples ou sem imagem de inspiração.",
+            timeout: true,
+          },
+          { status: 504 }
+        );
+      }
+      
+      // Verificar se é um erro de timeout do Netlify
+      if (error.message.includes('Inactivity Timeout') || error.message.includes('504')) {
+        return NextResponse.json(
+          {
+            error: "A geração do post demorou muito e foi interrompida pelo servidor. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação.",
+            timeout: true,
+          },
+          { status: 504 }
+        );
+      }
     }
     
     return NextResponse.json(

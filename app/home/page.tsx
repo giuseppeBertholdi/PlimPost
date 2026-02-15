@@ -619,7 +619,14 @@ export default function HomePage() {
       if (error instanceof Error) {
         // Se for um erro de parsing JSON, dar uma mensagem mais clara
         if (error.message.includes("JSON") || error.message.includes("Unexpected token")) {
-          message = "Erro de comunicação com o servidor. Verifique se a API está configurada corretamente.";
+          // Verificar se é um timeout do Netlify
+          if (error.message.includes("Inactivity Timeout") || error.message.includes("504")) {
+            message = "A geração do post demorou muito e foi interrompida. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação (remova imagem de inspiração, use um tema mais simples).";
+          } else {
+            message = "Erro de comunicação com o servidor. Verifique se a API está configurada corretamente.";
+          }
+        } else if (error.message.includes("504") || error.message.includes("timeout") || error.message.includes("Timeout")) {
+          message = "A geração do post demorou muito e foi interrompida. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação (remova imagem de inspiração, use um tema mais simples).";
         } else {
           message = error.message;
         }
