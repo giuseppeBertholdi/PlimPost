@@ -6,12 +6,12 @@
   NODE_VERSION = "20"
 
 # Configuração de timeout para funções (em segundos)
-# O Netlify tem limite máximo de 26 segundos para funções no plano gratuito
-# Para planos pagos, pode ser configurado até 60 segundos
+# O Netlify tem limite máximo de 10 segundos para funções no plano gratuito
+# Para planos pagos, pode ser configurado até 26 segundos (ou mais)
+# Nota: O timeout não pode ser configurado diretamente aqui para funções Next.js
+# As funções Next.js usam o timeout padrão do Netlify
 [functions]
   node_bundler = "esbuild"
-  # Timeout de 26 segundos (máximo para plano gratuito)
-  timeout = 26
 
 # O Netlify detecta automaticamente Next.js e usa o plugin apropriado
 
