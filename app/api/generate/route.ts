@@ -792,14 +792,23 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       
       await savePostToDb(payload, caption, imageUrl);
 
-      return NextResponse.json({ 
+      const responseData = { 
         post: caption,
         originalPost: postText, // Manter o texto original também
         image: imageBase64 ? `data:${imageMimeType};base64,${imageBase64}` : null,
         imageUrl: imageUrl,
         palette: payload.palette,
         businessName: payload.onboarding.business_name
+      };
+
+      console.log("✅ Post gerado com sucesso:", {
+        hasPost: !!responseData.post,
+        postLength: responseData.post?.length || 0,
+        hasImage: !!(responseData.image || responseData.imageUrl),
+        imageType: responseData.image ? 'base64' : responseData.imageUrl ? 'url' : 'none'
       });
+
+      return NextResponse.json(responseData);
     } catch (imageError) {
       console.error("Error generating image:", imageError);
       await savePostToDb(payload, postText, null);

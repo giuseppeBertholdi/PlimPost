@@ -532,10 +532,23 @@ export default function HomePage() {
     };
 
     try {
+      console.log("🚀 Iniciando geração de post...", { 
+        hasOnboarding: !!onboarding, 
+        hasUserId: !!user?.id,
+        mainTheme: mainTheme.trim().substring(0, 50),
+        objective: finalObjective.substring(0, 50)
+      });
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      });
+
+      console.log("📡 Resposta recebida:", { 
+        status: response.status, 
+        ok: response.ok,
+        contentType: response.headers.get("content-type")
       });
 
       // Verificar se a resposta é JSON antes de fazer o parse
@@ -544,10 +557,15 @@ export default function HomePage() {
       
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
+        console.log("✅ JSON parseado com sucesso:", { 
+          hasPost: !!data.post, 
+          hasImage: !!(data.image || data.imageUrl),
+          postLength: data.post?.length || 0
+        });
       } else {
         // Se não for JSON, tentar ler como texto para debug
         const text = await response.text();
-        console.error("Resposta não é JSON:", text.substring(0, 200));
+        console.error("❌ Resposta não é JSON:", text.substring(0, 500));
         throw new Error(
           response.status === 404
             ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
@@ -556,6 +574,7 @@ export default function HomePage() {
       }
 
       if (!response.ok) {
+        console.error("❌ Resposta não OK:", { status: response.status, data });
         // Handle timeout errors (504 Gateway Timeout)
         if (response.status === 504 || data?.timeout) {
           const timeoutMessage = data?.error || 
@@ -599,9 +618,26 @@ export default function HomePage() {
         throw new Error(data?.error || "Erro ao gerar o post.");
       }
 
+      // Verificar se temos dados válidos
+      if (!data.post && !data.image && !data.imageUrl) {
+        console.error("⚠️ Resposta OK mas sem dados:", data);
+        throw new Error("A API retornou sucesso, mas não gerou nenhum conteúdo. Tente novamente.");
+      }
+
+      console.log("✨ Definindo resultados:", { 
+        postLength: data.post?.length || 0,
+        hasImage: !!(data.image || data.imageUrl),
+        imageType: data.image ? 'base64' : data.imageUrl ? 'url' : 'none'
+      });
+
       setGeneratedPost(data.post ?? "");
       // Usar imageUrl se disponível (imagem salva), senão usar base64
       setGeneratedImage(data.imageUrl ?? data.image ?? null);
+      
+      console.log("✅ Estados atualizados:", { 
+        generatedPost: !!data.post, 
+        generatedImage: !!(data.imageUrl || data.image) 
+      });
       
       // Inicializar chat com mensagem de boas-vindas
       setChatMessages([{
@@ -1232,7 +1268,7 @@ export default function HomePage() {
           </div>
 
           {/* Resultado Gerado */}
-          {generatedImage && (
+          {(generatedImage || generatedPost) && (
             <div className="mt-6 rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white p-6 shadow-lg">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -1258,13 +1294,23 @@ export default function HomePage() {
                 Limpar e gerar novo
               </button>
               </div>
-              <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
-                <img
-                  src={generatedImage}
-                  alt="Post gerado para Instagram"
-                  className="h-full w-full object-contain"
-                />
-              </div>
+              {generatedImage ? (
+                <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
+                  <img
+                    src={generatedImage}
+                    alt="Post gerado para Instagram"
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      console.error("Erro ao carregar imagem:", e);
+                      setErrorMessage("Erro ao carregar a imagem gerada. O texto foi gerado com sucesso.");
+                    }}
+                  />
+                </div>
+              ) : generatedPost ? (
+                <div className="mx-auto rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-6 text-center">
+                  <p className="text-sm text-orange-700">⚠️ A imagem não pôde ser gerada, mas o texto foi criado com sucesso.</p>
+                </div>
+              ) : null}
               {/* Legenda Gerada */}
               {generatedPost && (
                 <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4">
