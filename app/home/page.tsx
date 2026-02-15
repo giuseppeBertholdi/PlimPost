@@ -562,6 +562,16 @@ export default function HomePage() {
             "A geração do post está demorando mais que o esperado. Isso pode acontecer quando há muitas requisições simultâneas ou quando a API do Gemini está lenta. Tente novamente em alguns instantes.";
           throw new Error(timeoutMessage);
         }
+        // Handle bad gateway errors (502)
+        if (response.status === 502 || data?.serverError || data?.networkError) {
+          const serverErrorMessage = data?.error || 
+            "O servidor está temporariamente indisponível ou houve um erro ao processar sua requisição. Isso pode ser causado por:\n" +
+            "• Limite de tempo do servidor excedido\n" +
+            "• Problemas temporários com a API do Gemini\n" +
+            "• Sobrecarga do servidor\n\n" +
+            "Por favor, tente novamente em alguns instantes. Se o problema persistir, tente simplificar sua solicitação (remover imagem de inspiração ou reduzir informações adicionais).";
+          throw new Error(serverErrorMessage);
+        }
         // Handle quota exceeded errors with retry information
         if (data?.quotaExceeded) {
           const retryInfo = data.retryAfter 

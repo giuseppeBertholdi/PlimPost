@@ -814,6 +814,7 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
     
     // Verificar se foi timeout ou abort
     if (error instanceof Error) {
+      // Erros de timeout/abort
       if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
         return NextResponse.json(
           {
@@ -834,16 +835,28 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
           { status: 504 }
         );
       }
+      
+      // Erros de rede ou conexão
+      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          {
+            error: "Erro de conexão com a API. Verifique sua conexão com a internet e tente novamente.",
+            networkError: true,
+          },
+          { status: 502 }
+        );
+      }
     }
     
+    // Erro genérico - retornar 502 para erros de gateway/proxy
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro inesperado ao gerar o post.",
+        error: error instanceof Error 
+          ? `Erro ao processar a requisição: ${error.message}. Tente novamente.`
+          : "Erro inesperado ao gerar o post. O servidor pode estar temporariamente indisponível. Tente novamente em alguns instantes.",
+        serverError: true,
       },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }
