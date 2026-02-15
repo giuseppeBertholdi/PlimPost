@@ -1460,42 +1460,48 @@ export default function HomePage() {
                 </div>
               )}
               <div className="mt-4 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = generatedImage;
-                    link.download = `post-instagram-${Date.now()}.png`;
-                    link.click();
-                  }}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                >
-                  <span>💾</span>
-                  Baixar imagem
-                </button>
-                <button
-                  type="button"
-                  onClick={async (event) => {
-                    try {
-                      await navigator.clipboard.writeText(generatedImage);
-                      // Feedback visual melhorado
-                      const btn = event.currentTarget;
-                      const originalText = btn.innerHTML;
-                      btn.innerHTML = '<span>✓</span> Copiado!';
-                      btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-                      setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
-                      }, 2000);
-                    } catch (err) {
-                      alert('Erro ao copiar. Tente novamente.');
-                    }
-                  }}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                >
-                  <span>📋</span>
-                  Copiar link
-                </button>
+                {generatedImage && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!generatedImage) return;
+                        const link = document.createElement('a');
+                        link.href = generatedImage;
+                        link.download = `post-instagram-${Date.now()}.png`;
+                        link.click();
+                      }}
+                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    >
+                      <span>💾</span>
+                      Baixar imagem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (event) => {
+                        if (!generatedImage) return;
+                        try {
+                          await navigator.clipboard.writeText(generatedImage);
+                          // Feedback visual melhorado
+                          const btn = event.currentTarget;
+                          const originalText = btn.innerHTML;
+                          btn.innerHTML = '<span>✓</span> Copiado!';
+                          btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+                          setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+                          }, 2000);
+                        } catch (err) {
+                          alert('Erro ao copiar. Tente novamente.');
+                        }
+                      }}
+                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    >
+                      <span>📋</span>
+                      Copiar link
+                    </button>
+                  </>
+                )}
               </div>
               
               {/* Chat de Modificação */}
