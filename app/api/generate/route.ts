@@ -399,7 +399,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = (await request.json()) as GeneratePayload;
+    let payload: GeneratePayload;
+    try {
+      payload = (await request.json()) as GeneratePayload;
+    } catch (parseError) {
+      console.error("Erro ao fazer parse do payload:", parseError);
+      return NextResponse.json(
+        { error: "Erro ao processar os dados da requisição. Verifique se todos os campos estão corretos." },
+        { status: 400 }
+      );
+    }
 
     if (!payload?.onboarding || !payload?.mainTheme || !payload?.objective) {
       return NextResponse.json(
@@ -464,9 +473,9 @@ export async function POST(request: Request) {
     // Primeiro, gerar o texto do post
     const prompt = buildPrompt(payload);
 
-    // Timeout de 18 segundos para a requisição de texto (Netlify tem timeout de 10s, mas com edge functions pode ser maior)
+    // Timeout de 8 segundos para a requisição de texto (Netlify tem timeout de 10s no plano gratuito)
     const textController = new AbortController();
-    const textTimeout = setTimeout(() => textController.abort(), 18000);
+    const textTimeout = setTimeout(() => textController.abort(), 8000);
 
     const textResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
@@ -605,9 +614,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 18 segundos para a requisição de imagem
+      // Timeout de 8 segundos para a requisição de imagem (Netlify tem timeout de 10s)
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 18000);
+      const imageTimeout = setTimeout(() => imageController.abort(), 8000);
 
       const imageResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
@@ -741,9 +750,9 @@ IMPORTANTE: Gere uma legenda COMPLETA e DESENVOLVIDA. Não seja breve demais. A 
 Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 `.trim();
 
-          // Timeout de 15 segundos para a requisição de legenda
+          // Timeout de 5 segundos para a requisição de legenda (opcional, pode ser pulado se necessário)
           const captionController = new AbortController();
-          const captionTimeout = setTimeout(() => captionController.abort(), 15000);
+          const captionTimeout = setTimeout(() => captionController.abort(), 5000);
 
           const captionResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
@@ -812,6 +821,13 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
   } catch (error) {
     console.error("Generate API error:", error);
     
+    // Log detalhado para debug
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
+    
     // Verificar se foi timeout ou abort
     if (error instanceof Error) {
       // Erros de timeout/abort
@@ -846,15 +862,30 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
           { status: 502 }
         );
       }
+      
+      // Erros do Supabase
+      if (error.message.includes('Supabase') || error.message.includes('supabase')) {
+        return NextResponse.json(
+          {
+            error: "Erro ao acessar o banco de dados. Tente novamente em alguns instantes.",
+            databaseError: true,
+          },
+          { status: 502 }
+        );
+      }
     }
     
     // Erro genérico - retornar 502 para erros de gateway/proxy
+    // Garantir que sempre retornamos JSON válido
+    const errorMessage = error instanceof Error 
+      ? error.message
+      : "Erro desconhecido";
+    
     return NextResponse.json(
       {
-        error: error instanceof Error 
-          ? `Erro ao processar a requisição: ${error.message}. Tente novamente.`
-          : "Erro inesperado ao gerar o post. O servidor pode estar temporariamente indisponível. Tente novamente em alguns instantes.",
+        error: `Erro ao processar a requisição: ${errorMessage}. O servidor pode estar temporariamente indisponível ou a requisição pode ter excedido o tempo limite. Tente novamente em alguns instantes ou simplifique sua solicitação.`,
         serverError: true,
+        errorType: error instanceof Error ? error.name : "UnknownError",
       },
       { status: 502 }
     );
