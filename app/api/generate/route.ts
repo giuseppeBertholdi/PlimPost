@@ -453,30 +453,48 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 18 segundos para a requisição de imagem
+      // Timeout de 25 segundos para a requisição de imagem (aumentado para evitar abortos prematuros)
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 18000);
+      const imageTimeout = setTimeout(() => imageController.abort(), 25000);
 
-      const imageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: parts,
+      let imageResponse: Response;
+      try {
+        imageResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: parts,
+                },
+              ],
+              generationConfig: {
+                temperature: 0.85,
+                topP: 0.95,
               },
-            ],
-            generationConfig: {
-              temperature: 0.85,
-              topP: 0.95,
-            },
-          }),
-          signal: imageController.signal,
+            }),
+            signal: imageController.signal,
+          }
+        );
+        clearTimeout(imageTimeout);
+      } catch (fetchError) {
+        clearTimeout(imageTimeout);
+        // Verificar se foi abortado por timeout
+        if (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('aborted'))) {
+          console.error("Error generating image: AbortError - timeout atingido");
+          await savePostToDb(payload, postText, null);
+          return NextResponse.json({
+            post: postText,
+            imageError: "A geração da imagem demorou muito e foi interrompida. Tente novamente com uma imagem de inspiração menor ou sem imagem de inspiração.",
+            timeout: true,
+          });
         }
-      ).finally(() => clearTimeout(imageTimeout));
+        // Re-throw outros erros para serem capturados pelo catch externo
+        throw fetchError;
+      }
 
       if (!imageResponse.ok) {
         // Verificar se foi timeout
@@ -689,6 +707,17 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       return NextResponse.json(responseData);
     } catch (imageError) {
       console.error("Error generating image:", imageError);
+      
+      // Verificar se foi abortado por timeout
+      if (imageError instanceof Error && (imageError.name === 'AbortError' || imageError.message.includes('aborted'))) {
+        await savePostToDb(payload, postText, null);
+        return NextResponse.json({
+          post: postText,
+          imageError: "A geração da imagem demorou muito e foi interrompida. Tente novamente com uma imagem de inspiração menor ou sem imagem de inspiração.",
+          timeout: true,
+        });
+      }
+      
       await savePostToDb(payload, postText, null);
       // Se falhar a imagem, retorna pelo menos o texto
       return NextResponse.json({ 
