@@ -538,68 +538,24 @@ export default function HomePage() {
         body: JSON.stringify(payload),
       });
 
-      // Tentar fazer parse da resposta como JSON
-      let data: any;
+      // Verificar se a resposta é JSON antes de fazer o parse
       const contentType = response.headers.get("content-type");
+      let data: any;
       
-      try {
-        // Tentar fazer parse como JSON primeiro
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        // Se não for JSON, tentar ler como texto para debug
         const text = await response.text();
-        
-        // Tentar fazer parse JSON mesmo se o content-type não indicar
-        try {
-          data = JSON.parse(text);
-        } catch (parseError) {
-          // Se não for JSON válido, verificar se é erro do Netlify
-          console.error("Resposta não é JSON válido:", text.substring(0, 200));
-          
-          // Verificar se é erro 502 do Netlify
-          if (response.status === 502) {
-            throw new Error(
-              "O servidor está temporariamente indisponível. Isso geralmente acontece quando:\n" +
-              "• A requisição demorou muito e foi interrompida\n" +
-              "• Há problemas temporários com a API do Gemini\n" +
-              "• O servidor está sobrecarregado\n\n" +
-              "Por favor, tente novamente em alguns instantes. Se o problema persistir, tente:\n" +
-              "• Remover a imagem de inspiração\n" +
-              "• Reduzir informações adicionais\n" +
-              "• Simplificar o tema do post"
-            );
-          }
-          
-          throw new Error(
-            response.status === 404
-              ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
-              : `Erro no servidor (${response.status}). Tente novamente mais tarde.`
-          );
-        }
-      } catch (textError) {
-        // Se já foi lançado um erro acima, propagar
-        if (textError instanceof Error && textError.message.includes("servidor")) {
-          throw textError;
-        }
-        // Caso contrário, erro genérico
-        throw new Error("Erro ao processar a resposta do servidor. Tente novamente.");
+        console.error("Resposta não é JSON:", text.substring(0, 200));
+        throw new Error(
+          response.status === 404
+            ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
+            : `Erro no servidor (${response.status}). Tente novamente mais tarde.`
+        );
       }
 
       if (!response.ok) {
-        // Verificar se é erro do Netlify (formato específico)
-        if (data?.errorType === "Error" || data?.errorMessage) {
-          const netlifyError = data.errorMessage || data.error || "Erro desconhecido no servidor";
-          
-          if (response.status === 502) {
-            throw new Error(
-              "O servidor encontrou um erro ao processar sua requisição. Isso pode ser causado por:\n" +
-              "• Limite de tempo do servidor excedido\n" +
-              "• Problemas temporários com a API do Gemini\n" +
-              "• Sobrecarga do servidor\n\n" +
-              "Por favor, tente novamente em alguns instantes. Se o problema persistir, tente simplificar sua solicitação."
-            );
-          }
-          
-          throw new Error(`Erro no servidor: ${netlifyError}`);
-        }
-        
         // Handle timeout errors (504 Gateway Timeout)
         if (response.status === 504 || data?.timeout) {
           const timeoutMessage = data?.error || 
