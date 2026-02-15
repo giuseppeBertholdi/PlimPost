@@ -616,12 +616,13 @@ export default function HomePage() {
         inspirationImageSize: inspirationImageBase64?.length || 0
       });
 
-      // Criar um AbortController com timeout de 25 segundos (mais que o limite do Netlify)
+      // Criar um AbortController com timeout de 60 segundos
+      // O servidor pode levar até 18s (texto) + 18s (imagem) + 15s (caption) = ~51s + overhead
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.warn("⏱️ Timeout do cliente atingido (25s)");
+        console.warn("⏱️ Timeout do cliente atingido (60s)");
         controller.abort();
-      }, 25000);
+      }, 60000);
 
       let response: Response;
       try {
@@ -635,7 +636,7 @@ export default function HomePage() {
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error("A requisição demorou muito e foi cancelada. Tente novamente com uma imagem menor ou sem imagem de inspiração.");
+          throw new Error("TIMEOUT_CLIENT");
         }
         throw fetchError;
       }
@@ -759,15 +760,17 @@ export default function HomePage() {
       
       if (error instanceof Error) {
         // Erro de timeout do cliente (AbortError)
-        if (error.name === 'AbortError' || error.message.includes("cancelada") || error.message.includes("demorou muito")) {
+        if (error.name === 'AbortError' || error.message.includes("cancelada") || error.message.includes("demorou muito") || error.message === "TIMEOUT_CLIENT") {
           message = "A requisição demorou muito e foi cancelada. Isso pode acontecer quando:\n" +
             "• A imagem de inspiração é muito grande\n" +
             "• A conexão está lenta\n" +
-            "• O servidor está sobrecarregado\n\n" +
+            "• O servidor está sobrecarregado\n" +
+            "• A API do Gemini está demorando para responder\n\n" +
             "Tente:\n" +
             "• Remover a imagem de inspiração\n" +
-            "• Usar uma imagem menor\n" +
+            "• Usar uma imagem menor (menos de 1MB)\n" +
             "• Simplificar o tema do post\n" +
+            "• Reduzir informações adicionais\n" +
             "• Tentar novamente em alguns instantes";
         }
         // Se for um erro de parsing JSON, dar uma mensagem mais clara
@@ -1358,12 +1361,15 @@ export default function HomePage() {
               className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-lg"
             >
               {isGenerating ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Gerando seu post...
+                <span className="flex flex-col items-center justify-center gap-2">
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Gerando seu post...
+                  </span>
+                  <span className="text-xs opacity-75">Isso pode levar até 60 segundos. Por favor, aguarde...</span>
                 </span>
               ) : (
                 "✨ Gerar Post para Instagram"
