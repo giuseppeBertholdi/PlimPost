@@ -44,6 +44,54 @@ async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
   }
 }
 
+// Função auxiliar para comprimir imagem
+async function compressImage(file: File, maxWidth = 1024, quality = 0.8): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Redimensionar se necessário
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Não foi possível criar contexto do canvas'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: file.type }));
+            } else {
+              reject(new Error('Falha ao comprimir imagem'));
+            }
+          },
+          file.type,
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function HomePage() {
   const router = useRouter();
   
@@ -491,7 +539,30 @@ export default function HomePage() {
     let inspirationImageBase64: string | undefined = undefined;
     if (inspirationImageFile) {
       try {
-        const arrayBuffer = await inspirationImageFile.arrayBuffer();
+        // Limitar tamanho da imagem (2MB)
+        const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+        if (inspirationImageFile.size > MAX_IMAGE_SIZE) {
+          setErrorMessage("A imagem de inspiração é muito grande. Use uma imagem menor que 2MB ou remova a imagem.");
+          setIsGenerating(false);
+          isGeneratingRef.current = false;
+          return;
+        }
+
+        console.log("📸 Processando imagem de inspiração...", {
+          originalSize: inspirationImageFile.size,
+          type: inspirationImageFile.type
+        });
+
+        // Comprimir a imagem antes de converter para base64
+        const compressedImage = await compressImage(inspirationImageFile, 1024, 0.8);
+        
+        console.log("✅ Imagem comprimida:", {
+          originalSize: inspirationImageFile.size,
+          compressedSize: compressedImage.size,
+          reduction: `${Math.round((1 - compressedImage.size / inspirationImageFile.size) * 100)}%`
+        });
+
+        const arrayBuffer = await compressedImage.arrayBuffer();
         const base64 = btoa(
           new Uint8Array(arrayBuffer).reduce(
             (data, byte) => data + String.fromCharCode(byte),
@@ -499,11 +570,15 @@ export default function HomePage() {
           )
         );
         // Extrair o tipo MIME da imagem
-        const mimeType = inspirationImageFile.type || "image/png";
+        const mimeType = compressedImage.type || "image/png";
         inspirationImageBase64 = `data:${mimeType};base64,${base64}`;
       } catch (error) {
-        console.error("Erro ao converter imagem para base64:", error);
-        setErrorMessage("Erro ao processar a imagem de inspiração.");
+        console.error("Erro ao processar imagem:", error);
+        setErrorMessage(
+          error instanceof Error && error.message.includes("comprimir")
+            ? "Erro ao comprimir a imagem. Tente com outra imagem ou remova a imagem de inspiração."
+            : "Erro ao processar a imagem de inspiração. Tente novamente ou remova a imagem."
+        );
         setIsGenerating(false);
         isGeneratingRef.current = false;
         return;
@@ -536,14 +611,34 @@ export default function HomePage() {
         hasOnboarding: !!onboarding, 
         hasUserId: !!user?.id,
         mainTheme: mainTheme.trim().substring(0, 50),
-        objective: finalObjective.substring(0, 50)
+        objective: finalObjective.substring(0, 50),
+        hasInspirationImage: !!inspirationImageBase64,
+        inspirationImageSize: inspirationImageBase64?.length || 0
       });
 
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // Criar um AbortController com timeout de 25 segundos (mais que o limite do Netlify)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn("⏱️ Timeout do cliente atingido (25s)");
+        controller.abort();
+      }, 25000);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal, // Adicionar o signal para permitir cancelamento
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error("A requisição demorou muito e foi cancelada. Tente novamente com uma imagem menor ou sem imagem de inspiração.");
+        }
+        throw fetchError;
+      }
 
       console.log("📡 Resposta recebida:", { 
         status: response.status, 
@@ -663,22 +758,38 @@ export default function HomePage() {
       let message = "Erro ao gerar o post.";
       
       if (error instanceof Error) {
+        // Erro de timeout do cliente (AbortError)
+        if (error.name === 'AbortError' || error.message.includes("cancelada") || error.message.includes("demorou muito")) {
+          message = "A requisição demorou muito e foi cancelada. Isso pode acontecer quando:\n" +
+            "• A imagem de inspiração é muito grande\n" +
+            "• A conexão está lenta\n" +
+            "• O servidor está sobrecarregado\n\n" +
+            "Tente:\n" +
+            "• Remover a imagem de inspiração\n" +
+            "• Usar uma imagem menor\n" +
+            "• Simplificar o tema do post\n" +
+            "• Tentar novamente em alguns instantes";
+        }
         // Se for um erro de parsing JSON, dar uma mensagem mais clara
-        if (error.message.includes("JSON") || error.message.includes("Unexpected token")) {
+        else if (error.message.includes("JSON") || error.message.includes("Unexpected token")) {
           // Verificar se é um timeout do Netlify
           if (error.message.includes("Inactivity Timeout") || error.message.includes("504")) {
             message = "A geração do post demorou muito e foi interrompida. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação (remova imagem de inspiração, use um tema mais simples).";
           } else {
             message = "Erro de comunicação com o servidor. Verifique se a API está configurada corretamente.";
           }
-        } else if (error.message.includes("504") || error.message.includes("timeout") || error.message.includes("Timeout")) {
+        } 
+        // Erros de timeout do servidor
+        else if (error.message.includes("504") || error.message.includes("timeout") || error.message.includes("Timeout")) {
           message = "A geração do post demorou muito e foi interrompida. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação (remova imagem de inspiração, use um tema mais simples).";
-        } else {
+        } 
+        // Outros erros
+        else {
           message = error.message;
         }
       }
       
-      console.error("Erro ao gerar post:", error);
+      console.error("❌ Erro ao gerar post:", error);
       setErrorMessage(message);
     } finally {
       setIsGenerating(false);
