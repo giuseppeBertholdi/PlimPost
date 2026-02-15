@@ -38,10 +38,6 @@ type ModifyPayload = {
   currentFontText?: string;
   imageStyle?: string;
   textStyle?: string;
-  // Campos adicionais para salvar na galeria
-  objective?: string;
-  mainTheme?: string;
-  extraInfo?: string;
 };
 
 const buildModificationPrompt = (
@@ -347,74 +343,6 @@ export async function POST(request: Request) {
             console.error('Error saving image to storage:', storageError);
           }
         }
-      }
-    }
-
-    // Salvar o post modificado na galeria
-    if (payload.userId && supabaseAdmin) {
-      try {
-        let finalImageUrl: string | null = null;
-        
-        // Se a imagem for um data URL (base64), salvar no storage primeiro
-        if (modifiedImage.startsWith('data:image')) {
-          try {
-            // Extrair base64 e mimeType do data URL
-            const match = modifiedImage.match(/^data:([^;]+);base64,(.+)$/);
-            if (match) {
-              const [, mimeType, base64Data] = match;
-              const imageBuffer = Buffer.from(base64Data, 'base64');
-              const fileName = `posts/${payload.userId}-${Date.now()}.png`;
-              
-              const { error: uploadError } = await supabaseAdmin.storage
-                .from('posts')
-                .upload(fileName, imageBuffer, {
-                  contentType: mimeType,
-                  upsert: false,
-                });
-
-              if (!uploadError) {
-                const { data: { publicUrl } } = supabaseAdmin.storage
-                  .from('posts')
-                  .getPublicUrl(fileName);
-                finalImageUrl = publicUrl;
-              } else {
-                console.error("[modify-post] Erro ao salvar imagem no storage:", uploadError);
-                // Se falhar, usar o data URL mesmo assim
-                finalImageUrl = modifiedImage;
-              }
-            } else {
-              finalImageUrl = modifiedImage;
-            }
-          } catch (storageErr) {
-            console.error("[modify-post] Erro ao processar imagem para storage:", storageErr);
-            finalImageUrl = modifiedImage;
-          }
-        } else {
-          // Se já for uma URL pública, usar diretamente
-          finalImageUrl = modifiedImage;
-        }
-        
-        const { error: saveError } = await supabaseAdmin
-          .from("generated_posts")
-          .insert({
-            user_id: payload.userId,
-            post_text: modifiedPostText,
-            post_image_url: finalImageUrl,
-            objective: payload.objective || "Modificação de post",
-            main_theme: payload.mainTheme || "Post modificado via chat",
-            extra_info: payload.extraInfo || null,
-            palette_name: payload.currentPalette?.name || null,
-            palette_colors: payload.currentPalette?.colors || null,
-          });
-        
-        if (saveError) {
-          console.error("[modify-post] Erro ao salvar post modificado na galeria:", saveError);
-        } else {
-          console.log("[modify-post] Post modificado salvo na galeria com sucesso");
-        }
-      } catch (saveErr) {
-        console.error("[modify-post] Erro ao salvar post modificado:", saveErr);
-        // Não falhar a requisição se houver erro ao salvar na galeria
       }
     }
 

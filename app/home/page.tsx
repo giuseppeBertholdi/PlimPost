@@ -374,10 +374,6 @@ export default function HomePage() {
           currentFontText: DEFAULT_FONT_TEXT,
           imageStyle: imageStyle,
           textStyle: textStyle,
-          // Campos para salvar na galeria
-          objective: objective === "Outro" ? customObjective.trim() : objective,
-          mainTheme: mainTheme,
-          extraInfo: extraInfo,
         }),
       });
 
