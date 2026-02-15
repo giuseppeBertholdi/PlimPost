@@ -61,6 +61,13 @@ export default function HomePage() {
   // Estado de créditos
   const [credits, setCredits] = useState<number | null>(null);
   
+  // Estados do chat de modificação
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isModifying, setIsModifying] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  
   // Estados de paleta de cores
   // selectedPalette: índice da paleta selecionada (-1 = paleta personalizada)
   const [selectedPalette, setSelectedPalette] = useState(0);
@@ -312,6 +319,120 @@ export default function HomePage() {
     loadCredits();
   }, [user?.id]);
 
+  // Scroll automático do chat
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
+  const handleModifyPost = async (message: string) => {
+    if (!message.trim() || !user?.id || !onboarding || !generatedPost || !generatedImage) {
+      return;
+    }
+
+    if (isModifying) return;
+
+    setIsModifying(true);
+    setErrorMessage(null);
+
+    // Adicionar mensagem do usuário
+    const userMessage = {
+      role: 'user' as const,
+      content: message,
+      timestamp: new Date()
+    };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput("");
+
+    try {
+      const currentPalette = selectedPalette >= 0 
+        ? paletteOptions[selectedPalette]
+        : { name: 'Personalizada', colors: customPalette };
+
+      const response = await safeFetchJson('/api/modify-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          originalPost: generatedPost,
+          originalImage: generatedImage,
+          modificationRequest: message,
+          onboarding: {
+            business_name: onboarding.business_name,
+            business_description: onboarding.business_description,
+            business_differential: onboarding.business_differential,
+            tone_tags: onboarding.tone_tags,
+            target_audience: onboarding.target_audience,
+            logo_url: onboarding.logo_url,
+            brand_color_primary: onboarding.brand_color_primary,
+            brand_color_secondary: onboarding.brand_color_secondary,
+            brand_color_text: onboarding.brand_color_text,
+          },
+          currentPalette: currentPalette,
+          currentFontTitle: DEFAULT_FONT_TITLE,
+          currentFontText: DEFAULT_FONT_TEXT,
+          imageStyle: imageStyle,
+          textStyle: textStyle,
+        }),
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao modificar o post');
+      }
+
+      // Atualizar post e imagem
+      setGeneratedPost(response.post);
+      setGeneratedImage(response.image);
+
+      // Adicionar resposta da IA
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '✅ Modificação aplicada com sucesso! O post foi atualizado. Você pode continuar pedindo mais alterações.',
+        timestamp: new Date()
+      }]);
+
+      // Recarregar créditos
+      try {
+        const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
+        if (creditsResponse.ok) {
+          const creditsData = await creditsResponse.json();
+          setCredits(creditsData.credits ?? 0);
+        }
+      } catch (err) {
+        console.error("Erro ao recarregar créditos:", err);
+      }
+    } catch (error) {
+      let errorMsg = 'Erro ao modificar o post.';
+      
+      if (error instanceof Error) {
+        errorMsg = error.message;
+        
+        // Verificar se é erro de créditos insuficientes
+        if (error.message.includes('Créditos insuficientes') || error.message.includes('insufficientCredits')) {
+          errorMsg = 'Créditos insuficientes. Você precisa de pelo menos 1 crédito para modificar o post.';
+        }
+      }
+
+      setErrorMessage(errorMsg);
+      
+      // Adicionar mensagem de erro no chat
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ ${errorMsg}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsModifying(false);
+    }
+  };
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (chatInput.trim() && !isModifying) {
+      handleModifyPost(chatInput.trim());
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -326,6 +447,9 @@ export default function HomePage() {
     setErrorMessage(null);
     setGeneratedPost("");
     setGeneratedImage(null);
+    setShowChat(false);
+    setChatMessages([]);
+    setChatInput("");
 
     // Verificar se está carregando antes de validar
     if (isLoading) {
@@ -468,6 +592,14 @@ export default function HomePage() {
       setGeneratedPost(data.post ?? "");
       // Usar imageUrl se disponível (imagem salva), senão usar base64
       setGeneratedImage(data.imageUrl ?? data.image ?? null);
+      
+      // Inicializar chat com mensagem de boas-vindas
+      setChatMessages([{
+        role: 'assistant',
+        content: 'Olá! Posso ajudar você a modificar este post. Você pode pedir mudanças como "mude a fonte", "altere as cores", "reescreva o texto", etc. Cada modificação consome 1 crédito. 😊',
+        timestamp: new Date()
+      }]);
+      setShowChat(true);
       
       // Recarregar créditos após gerar post
       if (user?.id) {
@@ -959,55 +1091,75 @@ export default function HomePage() {
               </div>
             </div>
             <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2">
-              {/* Paleta */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-zinc-700">Cores</span>
+              {/* Paleta - Visual Melhorado */}
+              <div className="rounded-xl border-2 border-zinc-200 bg-white p-4 shadow-sm transition hover:border-orange-200 hover:shadow-md">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎨</span>
+                    <span className="text-sm font-semibold text-zinc-700">Paleta de Cores</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsPaletteOpen(true)}
-                    className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-orange-200 hover:bg-orange-50"
+                    className="rounded-lg border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-white px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:from-orange-100 hover:shadow-md"
                   >
-                    Alterar paleta
+                    Alterar
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-zinc-600">
-                    {selectedPalette < 0 ? "Personalizada" : paletteOptions[selectedPalette]?.name ?? "Personalizada"}
-                  </span>
-                  <div className="flex items-center gap-2">
+                
+                <div className="mb-3 rounded-lg border border-zinc-100 bg-gradient-to-br from-zinc-50 to-white p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      {selectedPalette < 0 ? "Paleta Personalizada" : paletteOptions[selectedPalette]?.name ?? "Personalizada"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
                     {selectedPaletteColors.map((color, index) => (
-                      <label key={`${color}-${index}`} className="cursor-pointer group relative">
-                        <input
-                          type="color"
-                          value={color}
-                          onChange={(e) => {
-                            // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
-                            if (selectedPalette >= 0) {
-                              const newPalette = [...selectedPaletteColors];
-                              newPalette[index] = e.target.value;
-                              setCustomPalette(newPalette);
-                              setSelectedPalette(-1);
-                            } else {
-                              // Se já for personalizada, apenas atualizar
-                              const newPalette = [...customPalette];
-                              newPalette[index] = e.target.value;
-                              setCustomPalette(newPalette);
-                            }
+                      <label 
+                        key={`${color}-${index}`} 
+                        className="group relative cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div 
+                          className="h-12 w-12 rounded-xl border-3 border-white shadow-lg transition hover:scale-110 hover:shadow-xl sm:h-14 sm:w-14"
+                          style={{ 
+                            backgroundColor: color,
+                            borderColor: 'white',
+                            boxShadow: `0 4px 12px ${color}40, 0 0 0 2px white`
                           }}
-                          className="h-8 w-8 cursor-pointer rounded-full border-2 border-white shadow-md transition-all hover:scale-110 hover:shadow-lg appearance-none overflow-hidden"
-                          style={{ backgroundColor: color }}
-                          title={`Clique para alterar a cor ${index + 1}`}
-                        />
-                        <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none">
+                        >
+                          <input
+                            type="color"
+                            value={color}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
+                              if (selectedPalette >= 0) {
+                                const newPalette = [...selectedPaletteColors];
+                                newPalette[index] = e.target.value;
+                                setCustomPalette(newPalette);
+                                setSelectedPalette(-1);
+                              } else {
+                                // Se já for personalizada, apenas atualizar
+                                const newPalette = [...customPalette];
+                                newPalette[index] = e.target.value;
+                                setCustomPalette(newPalette);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                          />
+                        </div>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-zinc-900 px-2 py-1 text-xs font-mono text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 pointer-events-none z-10">
                           {color.toUpperCase()}
                         </span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-zinc-400">
-                  💡 Clique nas cores para personalizar ou use "Alterar paleta" para escolher um conjunto pronto
+                
+                <p className="text-xs text-zinc-500">
+                  💡 Clique nas cores para personalizar ou "Alterar" para escolher uma paleta pronta
                 </p>
               </div>
             </div>
@@ -1080,6 +1232,9 @@ export default function HomePage() {
                   setAdditionalText("");
                   setInspirationImage(null);
                   setInspirationImageFile(null);
+                  setShowChat(false);
+                  setChatMessages([]);
+                  setChatInput("");
                 }}
                 className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50"
               >
@@ -1167,6 +1322,97 @@ export default function HomePage() {
                   <span>📋</span>
                   Copiar link
                 </button>
+              </div>
+              
+              {/* Chat de Modificação */}
+              <div className="mt-6 rounded-xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/30 to-white">
+                <div className="border-b border-orange-200 bg-white/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-zinc-900">💬 Modificar Post com IA</h4>
+                      <p className="text-xs text-zinc-500">Peça alterações e a IA modificará seu post. Cada modificação consome 1 crédito.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowChat(!showChat)}
+                      className="rounded-lg border border-orange-200 bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 transition hover:bg-orange-50"
+                    >
+                      {showChat ? 'Ocultar' : 'Abrir'} Chat
+                    </button>
+                  </div>
+                </div>
+                
+                {showChat && (
+                  <div className="flex flex-col" style={{ maxHeight: '500px' }}>
+                    {/* Mensagens do Chat */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {chatMessages.map((msg, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                              msg.role === 'user'
+                                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white'
+                                : 'bg-white border border-zinc-200 text-zinc-700'
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                            <p className={`mt-1 text-xs ${msg.role === 'user' ? 'text-orange-100' : 'text-zinc-400'}`}>
+                              {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {isModifying && (
+                        <div className="flex justify-start">
+                          <div className="rounded-2xl bg-white border border-zinc-200 px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <svg className="h-4 w-4 animate-spin text-orange-500" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span className="text-sm text-zinc-500">Processando modificação...</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                    
+                    {/* Input do Chat */}
+                    <form onSubmit={handleChatSubmit} className="border-t border-orange-200 bg-white/50 p-4">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder="Ex: mude a fonte, altere as cores, reescreva o texto..."
+                          disabled={isModifying}
+                          className="flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-700 placeholder:text-zinc-400 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-200 disabled:bg-zinc-50 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!chatInput.trim() || isModifying}
+                          className="rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-orange-600 hover:to-orange-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-md"
+                        >
+                          {isModifying ? (
+                            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            'Enviar'
+                          )}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        💡 Cada modificação consome 1 crédito. Você tem {credits !== null ? credits : 0} crédito{credits !== 1 ? 's' : ''} disponível{credits !== 1 ? 'is' : ''}.
+                      </p>
+                    </form>
+                  </div>
+                )}
               </div>
             </div>
           )}
