@@ -15,36 +15,25 @@ const supabaseAdmin = supabaseServiceKey
     })
   : null;
 
-type OnboardingProfile = {
-  business_name: string;
-  business_description: string;
-  business_differential: string;
-  tone_tags: string[];
-  target_audience: string;
-};
-
+// Payload simplificado - apenas o essencial
 type GeneratePayload = {
-  onboarding: OnboardingProfile;
+  // Dados essenciais da marca
+  businessName: string;
+  businessDescription: string;
+  businessDifferential: string;
+  toneTags: string[];
+  targetAudience: string;
+  logoUrl?: string;
+  // Dados do post
   objective: string;
   mainTheme: string;
   extraInfo?: string;
-  palette?: {
-    name?: string;
-    colors?: string[];
-  };
-  /** Fonte para títulos / frase de destaque na imagem */
-  fontTitle?: string;
-  /** Fonte para o corpo do texto na imagem */
-  fontText?: string;
-  /** Texto adicional para aparecer na imagem */
-  additionalText?: string;
-  /** Estilo visual da imagem (moderno, minimalista, colorido, etc.) */
-  imageStyle?: string;
-  /** Estilo do texto (padrão, negrito, itálico, etc.) */
-  textStyle?: string;
-  userId?: string;
-  /** Imagem de inspiração em base64 (data:image/...) */
+  // Paleta simplificada (apenas cores)
+  paletteColors: string[];
+  // Imagem de inspiração (já comprimida em base64)
   inspirationImage?: string;
+  // User ID
+  userId?: string;
 };
 
 /** Salva o post na tabela generated_posts quando há userId e supabaseAdmin configurado. */
@@ -71,8 +60,7 @@ async function savePostToDb(
         objective: payload.objective,
         main_theme: payload.mainTheme,
         extra_info: payload.extraInfo || null,
-        palette_name: payload.palette?.name || null,
-        palette_colors: payload.palette?.colors || null,
+        palette_colors: payload.paletteColors || null,
       });
     if (error) console.error("[generate] Erro ao salvar post na galeria:", error);
   } catch (err) {
@@ -81,22 +69,21 @@ async function savePostToDb(
 }
 
 const buildPrompt = (payload: GeneratePayload) => {
-  const tones = payload.onboarding.tone_tags?.join(", ") || "Neutro";
+  const tones = payload.toneTags?.join(", ") || "Neutro";
   const extra = payload.extraInfo?.trim()
     ? payload.extraInfo.trim()
     : "Não informado";
-  const paletteName = payload.palette?.name ?? "Personalizada";
-  const paletteColors = payload.palette?.colors?.join(", ") ?? "Não informado";
+  const paletteColors = payload.paletteColors?.join(", ") || "#f97316, #fb923c, #0f172a";
 
   return `
 Você é um redator especialista em social media com talento para criar conteúdo autêntico, humano e envolvente. Seu objetivo é criar posts que soem como se fossem escritos por uma pessoa real, não por uma máquina.
 
 SOBRE A MARCA:
-- Nome: ${payload.onboarding.business_name}
-- O que faz: ${payload.onboarding.business_description}
-- O que a torna especial: ${payload.onboarding.business_differential}
+- Nome: ${payload.businessName}
+- O que faz: ${payload.businessDescription}
+- O que a torna especial: ${payload.businessDifferential}
 - Tom de voz: ${tones}
-- Público-alvo: ${payload.onboarding.target_audience}
+- Público-alvo: ${payload.targetAudience}
 
 SOBRE ESTE POST:
 - Objetivo: ${payload.objective}
@@ -208,18 +195,16 @@ const FONT_VISUAL_DESCRIPTIONS: Record<string, { title: string; body: string }> 
 };
 
 const buildImagePrompt = (payload: GeneratePayload, postText: string) => {
-  const tones = payload.onboarding.tone_tags?.join(", ") || "Neutro";
-  const paletteName = payload.palette?.name ?? "Personalizada";
-  const paletteColors = payload.palette?.colors?.join(", ") ?? "#f97316, #fb923c, #0f172a";
-  const onboarding = payload.onboarding as Record<string, unknown>;
-  const fontTitle: string = (payload.fontTitle ?? onboarding?.brand_font_title ?? onboarding?.brand_font ?? "Montserrat, sans-serif") as string;
-  const fontText: string = (payload.fontText ?? onboarding?.brand_font_text ?? onboarding?.brand_font ?? "Open Sans, sans-serif") as string;
-  const additionalText = payload.additionalText || "";
-  const imageStyle = payload.imageStyle || "moderno";
-  const textStyle = payload.textStyle || "padrão";
+  const tones = payload.toneTags?.join(", ") || "Neutro";
+  const paletteColors = payload.paletteColors?.join(", ") || "#f97316, #fb923c, #0f172a";
+  // Usar fontes padrão (simplificado)
+  const fontTitle = "Montserrat, sans-serif";
+  const fontText = "Open Sans, sans-serif";
+  const imageStyle = "moderno";
+  const textStyle = "padrão";
   const mainTheme = payload.mainTheme || "";
   const extraInfo = payload.extraInfo || "";
-  const logoUrl = onboarding?.logo_url as string | undefined;
+  const logoUrl = payload.logoUrl;
 
   const descTitle = FONT_VISUAL_DESCRIPTIONS[fontTitle]?.title ?? `fonte para título: ${fontTitle}, negrito e grande`;
   const descText = FONT_VISUAL_DESCRIPTIONS[fontText]?.body ?? `fonte para corpo: ${fontText}, regular e menor`;
@@ -243,7 +228,7 @@ const buildImagePrompt = (payload: GeneratePayload, postText: string) => {
     "destaque": "texto com destaque visual, usando cores ou efeitos especiais",
   };
 
-  const fullText = additionalText ? `${postText}\n\n${additionalText}` : postText;
+  const fullText = postText; // Removido additionalText para simplificar
   const imageStyleDesc = imageStyleDescriptions[imageStyle] || imageStyleDescriptions["moderno"];
   const textStyleDesc = textStyleDescriptions[textStyle] || textStyleDescriptions["padrão"];
 
@@ -267,9 +252,9 @@ ESPECIFICAÇÕES TÉCNICAS OBRIGATÓRIAS:
 - APENAS USE as fontes e cores, mas NUNCA as mencione textualmente na imagem
 
 SOBRE A MARCA:
-- Nome: ${payload.onboarding.business_name}
-- Descrição: ${payload.onboarding.business_description}
-- Diferencial: ${payload.onboarding.business_differential}
+- Nome: ${payload.businessName}
+- Descrição: ${payload.businessDescription}
+- Diferencial: ${payload.businessDifferential}
 - Tom de voz: ${tones}
 ${logoUrl ? `
 LOGO DA MARCA (CRÍTICO - SIGA EXATAMENTE):
@@ -289,7 +274,7 @@ Uma logo da marca foi fornecida como imagem de referência. REGRAS ABSOLUTAS E O
 IMPORTANTE: A logo é um elemento sagrado da identidade visual da marca. Ela DEVE aparecer na imagem gerada EXATAMENTE como foi fornecida, sem qualquer alteração visual, de cor, forma, estilo ou elemento. Use a logo da imagem de referência como modelo e replique-a identicamente na imagem gerada.
 
 ` : ''}
-PALETA DE CORES: ${paletteName}
+PALETA DE CORES:
 Cores principais: ${paletteColors}
 Use essas cores como base, crie variações e gradientes harmoniosos. 
 REGRA CRÍTICA: APENAS USE AS CORES NA IMAGEM, MAS NUNCA MOSTRE:
@@ -401,7 +386,7 @@ export async function POST(request: Request) {
 
     const payload = (await request.json()) as GeneratePayload;
 
-    if (!payload?.onboarding || !payload?.mainTheme || !payload?.objective) {
+    if (!payload?.businessName || !payload?.mainTheme || !payload?.objective) {
       return NextResponse.json(
         { error: "Dados insuficientes para gerar o post." },
         { status: 400 }
@@ -581,7 +566,7 @@ export async function POST(request: Request) {
     const imagePrompt = buildImagePrompt(payload, postText);
 
     // Usar gemini-3-pro-image-preview se houver imagem de inspiração ou logo
-    const hasLogo = !!(payload.onboarding as Record<string, unknown>)?.logo_url;
+    const hasLogo = !!payload.logoUrl;
     const finalImageModel = (payload.inspirationImage || hasLogo)
       ? "gemini-3-pro-image-preview" 
       : imageModel;
@@ -590,39 +575,52 @@ export async function POST(request: Request) {
       // Preparar as partes da requisição
       const parts: any[] = [{ text: imagePrompt }];
       
-      // Se houver logo, buscar e adicionar às partes
-      const logoUrl = (payload.onboarding as Record<string, unknown>)?.logo_url as string | undefined;
-      if (logoUrl) {
+      // Se houver logo, buscar e comprimir antes de adicionar
+      if (payload.logoUrl) {
         try {
-          const logoResponse = await fetch(logoUrl);
+          const logoResponse = await fetch(payload.logoUrl);
           if (logoResponse.ok) {
             const logoBuffer = await logoResponse.arrayBuffer();
+            // Comprimir logo: converter para base64 direto (já deve estar otimizado no Supabase)
             const logoBase64 = Buffer.from(logoBuffer).toString('base64');
             const contentType = logoResponse.headers.get('content-type') || 'image/png';
-            parts.push({
-              inlineData: {
-                mimeType: contentType,
-                data: logoBase64,
-              },
-            });
+            
+            // Limitar tamanho do logo (se muito grande, pular)
+            if (logoBase64.length > 500000) { // ~500KB em base64
+              console.warn("Logo muito grande, pulando...");
+            } else {
+              parts.push({
+                inlineData: {
+                  mimeType: contentType,
+                  data: logoBase64,
+                },
+              });
+            }
           }
         } catch (logoError) {
           console.warn("Erro ao buscar logo:", logoError);
         }
       }
       
-      // Se houver imagem de inspiração, adicionar ela às partes
+      // Se houver imagem de inspiração, adicionar ela às partes (já comprimida no frontend)
       if (payload.inspirationImage) {
-        // Extrair base64 e mimeType do data URL
-        const match = payload.inspirationImage.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          const [, mimeType, base64Data] = match;
-          parts.push({
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data,
-            },
-          });
+        // Extrair base64 da string data:image/...
+        const base64Match = payload.inspirationImage.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (base64Match) {
+          const mimeType = `image/${base64Match[1]}`;
+          const base64Data = base64Match[2];
+          
+          // Verificar tamanho (se muito grande mesmo comprimida, pular)
+          if (base64Data.length > 1000000) { // ~1MB em base64
+            console.warn("Imagem de inspiração ainda muito grande após compressão, pulando...");
+          } else {
+            parts.push({
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data,
+              },
+            });
+          }
         }
       }
 
@@ -738,16 +736,16 @@ export async function POST(request: Request) {
       
       if (imageBase64) {
         try {
-          const tones = payload.onboarding.tone_tags?.join(", ") || "Neutro";
+          const tones = payload.toneTags?.join(", ") || "Neutro";
           const captionPrompt = `
 Você é um especialista em criar legendas para posts do Instagram. Crie uma legenda autêntica, envolvente e que gere engajamento.
 
 SOBRE A MARCA:
-- Nome: ${payload.onboarding.business_name}
-- Descrição: ${payload.onboarding.business_description}
-- Diferencial: ${payload.onboarding.business_differential}
+- Nome: ${payload.businessName}
+- Descrição: ${payload.businessDescription}
+- Diferencial: ${payload.businessDifferential}
 - Tom de voz: ${tones}
-- Público-alvo: ${payload.onboarding.target_audience}
+- Público-alvo: ${payload.targetAudience}
 
 SOBRE O POST:
 - Objetivo: ${payload.objective}
@@ -861,8 +859,8 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
         originalPost: postText, // Manter o texto original também
         image: imageBase64 ? `data:${imageMimeType};base64,${imageBase64}` : null,
         imageUrl: imageUrl,
-        palette: payload.palette,
-        businessName: payload.onboarding.business_name
+        paletteColors: payload.paletteColors,
+        businessName: payload.businessName
       };
 
       console.log("✅ Post gerado com sucesso:", {

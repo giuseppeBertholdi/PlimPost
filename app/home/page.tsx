@@ -553,8 +553,8 @@ export default function HomePage() {
           type: inspirationImageFile.type
         });
 
-        // Comprimir a imagem antes de converter para base64
-        const compressedImage = await compressImage(inspirationImageFile, 1024, 0.8);
+        // Comprimir a imagem agressivamente antes de converter para base64 (512px, qualidade 0.6)
+        const compressedImage = await compressImage(inspirationImageFile, 512, 0.6);
         
         console.log("✅ Imagem comprimida:", {
           originalSize: inspirationImageFile.size,
@@ -585,25 +585,25 @@ export default function HomePage() {
       }
     }
 
+    // Payload simplificado - apenas o essencial
     const payload = {
-      onboarding,
+      // Apenas campos essenciais do onboarding
+      businessName: onboarding.business_name,
+      businessDescription: onboarding.business_description,
+      businessDifferential: onboarding.business_differential,
+      toneTags: onboarding.tone_tags,
+      targetAudience: onboarding.target_audience,
+      logoUrl: onboarding.logo_url || undefined,
+      // Campos do post
       objective: finalObjective,
       mainTheme: mainTheme.trim(),
-      extraInfo: extraInfo.trim(),
-      palette: {
-        name:
-          selectedPalette < 0
-            ? "Personalizada"
-            : paletteOptions[selectedPalette]?.name ?? "Personalizada",
-        colors: selectedPaletteColors,
-      },
-      fontTitle: DEFAULT_FONT_TITLE,
-      fontText: DEFAULT_FONT_TEXT,
-      additionalText: additionalText.trim() || undefined,
-      imageStyle: imageStyle,
-      textStyle: textStyle,
-      userId: currentUserId,
+      extraInfo: extraInfo.trim() || undefined,
+      // Paleta simplificada
+      paletteColors: selectedPaletteColors,
+      // Imagem de inspiração (já comprimida)
       inspirationImage: inspirationImageBase64,
+      // User ID para salvar na galeria
+      userId: currentUserId,
     };
 
     try {
