@@ -439,8 +439,28 @@ export async function POST(request: Request) {
     }
 
     const textData = await textResponse.json();
+    
+    // Verificar se há problemas com a resposta (conteúdo proibido, etc.)
+    const candidate = textData?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    
+    if (finishReason === 'PROHIBITED_CONTENT' || finishReason === 'SAFETY') {
+      console.error("Conteúdo proibido pelo Gemini:", {
+        finishReason,
+        finishMessage: candidate?.finishMessage,
+        textData,
+      });
+      return NextResponse.json(
+        { 
+          error: "O conteúdo solicitado viola as políticas de uso do Google. Por favor, ajuste o tema ou as informações do post e tente novamente.",
+          prohibitedContent: true,
+        },
+        { status: 400 }
+      );
+    }
+    
     const postText =
-      textData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+      candidate?.content?.parts?.[0]?.text?.trim() ?? "";
 
     if (!postText) {
       console.error("Resposta vazia do Gemini:", textData);
@@ -740,9 +760,21 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 
           if (captionResponse.ok) {
             const captionData = await captionResponse.json();
-            const generatedCaption = captionData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (generatedCaption) {
-              caption = generatedCaption;
+            const captionCandidate = captionData?.candidates?.[0];
+            const captionFinishReason = captionCandidate?.finishReason;
+            
+            // Verificar se a legenda foi bloqueada por conteúdo proibido
+            if (captionFinishReason === 'PROHIBITED_CONTENT' || captionFinishReason === 'SAFETY') {
+              console.warn("Legenda bloqueada por conteúdo proibido, usando texto original:", {
+                finishReason: captionFinishReason,
+                finishMessage: captionCandidate?.finishMessage,
+              });
+              // Continua com o texto original como fallback
+            } else {
+              const generatedCaption = captionCandidate?.content?.parts?.[0]?.text?.trim();
+              if (generatedCaption) {
+                caption = generatedCaption;
+              }
             }
           } else {
             console.warn("Falha ao gerar legenda, usando texto original");
