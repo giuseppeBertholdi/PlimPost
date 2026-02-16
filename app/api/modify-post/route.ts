@@ -129,13 +129,21 @@ Gere a imagem modificada conforme a solicitação do usuário.
 
 export async function POST(request: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash";
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "dall-e-3";
 
-    if (!apiKey) {
+    if (!geminiApiKey) {
       return NextResponse.json(
         { error: "GEMINI_API_KEY não configurada no ambiente." },
+        { status: 500 }
+      );
+    }
+
+    if (!openaiApiKey) {
+      return NextResponse.json(
+        { error: "OPENAI_API_KEY não configurada no ambiente." },
         { status: 500 }
       );
     }
@@ -216,7 +224,7 @@ export async function POST(request: Request) {
       const modificationPrompt = buildModificationPrompt(payload, payload.originalPost);
       
       const textResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiApiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -261,28 +269,13 @@ export async function POST(request: Request) {
     if (needsImageRegeneration) {
       const imagePrompt = buildImageModificationPrompt(payload, modifiedPostText);
       
-      // Preparar partes da requisição
-      const parts: any[] = [{ text: imagePrompt }];
+      // A OpenAI não suporta imagens de inspiração da mesma forma que o Gemini
+      // Vamos incluir informações sobre logo no prompt de texto
+      let enhancedPrompt = imagePrompt;
       
-      // Adicionar logo se houver
       const logoUrl = payload.onboarding.logo_url;
       if (logoUrl) {
-        try {
-          const logoResponse = await fetch(logoUrl);
-          if (logoResponse.ok) {
-            const logoBuffer = await logoResponse.arrayBuffer();
-            const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-            const contentType = logoResponse.headers.get('content-type') || 'image/png';
-            parts.push({
-              inlineData: {
-                mimeType: contentType,
-                data: logoBase64,
-              },
-            });
-          }
-        } catch (logoError) {
-          console.warn("Erro ao buscar logo:", logoError);
-        }
+        enhancedPrompt += "\n\nIMPORTANTE: Inclua o logo da marca na imagem. O logo está disponível em: " + logoUrl;
       }
 
       // Timeout para imagem
@@ -290,21 +283,19 @@ export async function POST(request: Request) {
       const imageTimeout = setTimeout(() => imageController.abort(), 25000);
 
       const imageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${imageModel}:generateContent?key=${apiKey}`,
+        `https://api.openai.com/v1/images/generations`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`,
+          },
           body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: parts,
-              },
-            ],
-            generationConfig: {
-              temperature: 0.85,
-              topP: 0.95,
-            },
+            model: imageModel,
+            prompt: enhancedPrompt,
+            size: "1024x1024",
+            quality: "standard",
+            n: 1,
           }),
           signal: imageController.signal,
         }
@@ -312,35 +303,38 @@ export async function POST(request: Request) {
 
       if (imageResponse.ok) {
         const imageData = await imageResponse.json();
-        const imagePart = imageData?.candidates?.[0]?.content?.parts?.find(
-          (part: any) => part.inlineData
-        );
-        const imageBase64 = imagePart?.inlineData?.data;
-        const imageMimeType = imagePart?.inlineData?.mimeType || 'image/png';
+        const imageUrlFromApi = imageData?.data?.[0]?.url;
         
-        if (imageBase64) {
-          modifiedImage = `data:${imageMimeType};base64,${imageBase64}`;
-          
-          // Salvar no Supabase Storage
-          try {
-            const imageBuffer = Buffer.from(imageBase64, 'base64');
-            const fileName = `posts/${payload.userId}-${Date.now()}.png`;
+        if (imageUrlFromApi) {
+          // Baixar a imagem da URL e converter para base64
+          const imageDownloadResponse = await fetch(imageUrlFromApi);
+          if (imageDownloadResponse.ok) {
+            const imageBuffer = await imageDownloadResponse.arrayBuffer();
+            const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+            const imageMimeType = 'image/png'; // OpenAI sempre retorna PNG
             
-            const { error: uploadError } = await supabaseAdmin.storage
-              .from('posts')
-              .upload(fileName, imageBuffer, {
-                contentType: imageMimeType,
-                upsert: false,
-              });
-
-            if (!uploadError) {
-              const { data: { publicUrl } } = supabaseAdmin.storage
+            modifiedImage = `data:${imageMimeType};base64,${imageBase64}`;
+            
+            // Salvar no Supabase Storage
+            try {
+              const fileName = `posts/${payload.userId}-${Date.now()}.png`;
+              
+              const { error: uploadError } = await supabaseAdmin.storage
                 .from('posts')
-                .getPublicUrl(fileName);
-              modifiedImage = publicUrl;
+                .upload(fileName, Buffer.from(imageBase64, 'base64'), {
+                  contentType: imageMimeType,
+                  upsert: false,
+                });
+
+              if (!uploadError) {
+                const { data: { publicUrl } } = supabaseAdmin.storage
+                  .from('posts')
+                  .getPublicUrl(fileName);
+                modifiedImage = publicUrl;
+              }
+            } catch (storageError) {
+              console.error('Error saving image to storage:', storageError);
             }
-          } catch (storageError) {
-            console.error('Error saving image to storage:', storageError);
           }
         }
       }

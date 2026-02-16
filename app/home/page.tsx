@@ -645,9 +645,9 @@ export default function HomePage() {
       let response: Response;
       try {
         response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
           signal: controller.signal, // Adicionar o signal para permitir cancelamento
         });
         clearTimeout(timeoutId);
@@ -875,18 +875,18 @@ export default function HomePage() {
                 Menu
               </summary>
               <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
-                <a
-                  href="/galeria"
+            <a
+              href="/galeria"
                   className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
-                >
-                  Galeria
-                </a>
-                <a
-                  href="/marca"
+            >
+              Galeria
+            </a>
+            <a
+              href="/marca"
                   className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
-                >
-                  Minha Marca
-                </a>
+            >
+              Minha Marca
+            </a>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -943,7 +943,7 @@ export default function HomePage() {
               <AdSidebar />
             </aside>
             
-            {/* Conteúdo Principal */}
+          {/* Conteúdo Principal */}
             <div className="flex-1 min-w-0">
             <div className="mb-6 text-center sm:mb-8">
           <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl md:text-4xl">
@@ -1304,7 +1304,7 @@ export default function HomePage() {
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                       {selectedPalette < 0 ? "Paleta Personalizada" : paletteOptions[selectedPalette]?.name ?? "Personalizada"}
-                    </span>
+                  </span>
                   </div>
                   <div className="flex items-center gap-3">
                     {selectedPaletteColors.map((color, index) => (
@@ -1321,27 +1321,27 @@ export default function HomePage() {
                             boxShadow: `0 4px 12px ${color}40, 0 0 0 2px white`
                           }}
                         >
-                          <input
-                            type="color"
-                            value={color}
-                            onChange={(e) => {
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={(e) => {
                               e.stopPropagation();
-                              // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
-                              if (selectedPalette >= 0) {
-                                const newPalette = [...selectedPaletteColors];
-                                newPalette[index] = e.target.value;
-                                setCustomPalette(newPalette);
-                                setSelectedPalette(-1);
-                              } else {
-                                // Se já for personalizada, apenas atualizar
-                                const newPalette = [...customPalette];
-                                newPalette[index] = e.target.value;
-                                setCustomPalette(newPalette);
-                              }
-                            }}
+                            // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
+                            if (selectedPalette >= 0) {
+                              const newPalette = [...selectedPaletteColors];
+                              newPalette[index] = e.target.value;
+                              setCustomPalette(newPalette);
+                              setSelectedPalette(-1);
+                            } else {
+                              // Se já for personalizada, apenas atualizar
+                              const newPalette = [...customPalette];
+                              newPalette[index] = e.target.value;
+                              setCustomPalette(newPalette);
+                            }
+                          }}
                             onClick={(e) => e.stopPropagation()}
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                          />
+                        />
                         </div>
                         <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-zinc-900 px-2 py-1 text-xs font-mono text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 pointer-events-none z-10">
                           {color.toUpperCase()}
@@ -1355,8 +1355,8 @@ export default function HomePage() {
                   💡 Clique nas cores para personalizar ou "Alterar" para escolher uma paleta pronta
                 </p>
               </div>
-            </div>
-          </div>
+                  </div>
+                  </div>
 
           {/* Botão de Gerar */}
           <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-4 sm:p-6">
@@ -1365,7 +1365,7 @@ export default function HomePage() {
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-xl text-white">
                     ⚠
-                  </div>
+                </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-red-800 sm:text-base">{errorMessage}</p>
                     {errorMessage.includes("Créditos insuficientes") && (
@@ -1376,8 +1376,8 @@ export default function HomePage() {
                         💎 Comprar Créditos Agora
                       </a>
                     )}
-                  </div>
                 </div>
+              </div>
               </div>
             )}
             <button
@@ -1388,12 +1388,12 @@ export default function HomePage() {
             >
               {isGenerating ? (
                 <span className="flex flex-col items-center justify-center gap-2">
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Gerando seu post...
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Gerando seu post...
                   </span>
                   <span className="text-xs opacity-75">Isso pode levar até 60 segundos. Por favor, aguarde...</span>
                 </span>
@@ -1439,17 +1439,17 @@ export default function HomePage() {
               </button>
               </div>
               {generatedImage ? (
-                <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
-                  <img
-                    src={generatedImage}
-                    alt="Post gerado para Instagram"
-                    className="h-full w-full object-contain"
+              <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
+                <img
+                  src={generatedImage}
+                  alt="Post gerado para Instagram"
+                  className="h-full w-full object-contain"
                     onError={(e) => {
                       console.error("Erro ao carregar imagem:", e);
                       setErrorMessage("Erro ao carregar a imagem gerada. O texto foi gerado com sucesso.");
                     }}
-                  />
-                </div>
+                />
+              </div>
               ) : generatedPost ? (
                 <div className="mx-auto rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-6 text-center">
                   <p className="text-sm text-orange-700">
@@ -1502,44 +1502,44 @@ export default function HomePage() {
               <div className="mt-4 flex items-center justify-center gap-3">
                 {generatedImage && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => {
+                <button
+                  type="button"
+                  onClick={() => {
                         if (!generatedImage) return;
-                        const link = document.createElement('a');
-                        link.href = generatedImage;
-                        link.download = `post-instagram-${Date.now()}.png`;
-                        link.click();
-                      }}
-                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                    >
-                      <span>💾</span>
-                      Baixar imagem
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async (event) => {
+                    const link = document.createElement('a');
+                    link.href = generatedImage;
+                    link.download = `post-instagram-${Date.now()}.png`;
+                    link.click();
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                >
+                  <span>💾</span>
+                  Baixar imagem
+                </button>
+                <button
+                  type="button"
+                  onClick={async (event) => {
                         if (!generatedImage) return;
-                        try {
-                          await navigator.clipboard.writeText(generatedImage);
-                          // Feedback visual melhorado
-                          const btn = event.currentTarget;
-                          const originalText = btn.innerHTML;
-                          btn.innerHTML = '<span>✓</span> Copiado!';
-                          btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-                          setTimeout(() => {
-                            btn.innerHTML = originalText;
-                            btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
-                          }, 2000);
-                        } catch (err) {
-                          alert('Erro ao copiar. Tente novamente.');
-                        }
-                      }}
-                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                    >
-                      <span>📋</span>
-                      Copiar link
-                    </button>
+                    try {
+                      await navigator.clipboard.writeText(generatedImage);
+                      // Feedback visual melhorado
+                      const btn = event.currentTarget;
+                      const originalText = btn.innerHTML;
+                      btn.innerHTML = '<span>✓</span> Copiado!';
+                      btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+                      setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+                      }, 2000);
+                    } catch (err) {
+                      alert('Erro ao copiar. Tente novamente.');
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                >
+                  <span>📋</span>
+                  Copiar link
+                </button>
                   </>
                 )}
               </div>
@@ -1595,11 +1595,11 @@ export default function HomePage() {
                               </svg>
                               <span className="text-sm text-zinc-500">Processando modificação...</span>
                             </div>
-                          </div>
-                        </div>
-                      )}
+              </div>
+            </div>
+          )}
                       <div ref={chatEndRef} />
-                    </div>
+          </div>
                     
                     {/* Input do Chat */}
                     <form onSubmit={handleChatSubmit} className="border-t border-orange-200 bg-white/50 p-4">
@@ -1682,31 +1682,31 @@ export default function HomePage() {
             <div className="mb-6">
               <p className="mb-3 text-sm font-semibold text-zinc-700">Paletas pré-definidas</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {paletteOptions.map((palette, index) => (
-                  <button
-                    key={palette.name}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPalette(index);
-                    }}
+              {paletteOptions.map((palette, index) => (
+                <button
+                  key={palette.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPalette(index);
+                  }}
                     className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                      selectedPalette === index
+                    selectedPalette === index
                         ? "border-orange-400 bg-orange-50 text-orange-700 shadow-md scale-[1.02]"
                         : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-300 hover:bg-orange-50/30 hover:shadow-sm"
-                    }`}
-                  >
+                  }`}
+                >
                     <span className="font-medium">{palette.name}</span>
                     <span className="flex items-center gap-1.5">
-                      {palette.colors.map((color) => (
-                        <span
-                          key={color}
+                    {palette.colors.map((color) => (
+                      <span
+                        key={color}
                           className="h-4 w-4 rounded-full border-2 border-white shadow-sm"
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </span>
-                  </button>
-                ))}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </span>
+                </button>
+              ))}
               </div>
             </div>
 
@@ -1739,16 +1739,16 @@ export default function HomePage() {
                 ))}
               </div>
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPalette(-1);
-                    setIsPaletteOpen(false);
-                  }}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPalette(-1);
+                  setIsPaletteOpen(false);
+                }}
                   className="flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl"
-                >
-                  Usar paleta personalizada
-                </button>
+              >
+                Usar paleta personalizada
+              </button>
                 <button
                   type="button"
                   onClick={() => setIsPaletteOpen(false)}

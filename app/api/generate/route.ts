@@ -238,15 +238,24 @@ export async function POST(request: Request) {
   try {
     console.log("[generate] Iniciando requisição de geração de post");
     
-    const apiKey = process.env.GEMINI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash";
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "dall-e-3";
     const captionModel = process.env.GEMINI_CAPTION_MODEL || "gemini-2.5-flash";
 
-    if (!apiKey) {
+    if (!geminiApiKey) {
       console.error("[generate] GEMINI_API_KEY não configurada");
       return NextResponse.json(
         { error: "GEMINI_API_KEY não configurada no ambiente." },
+        { status: 500 }
+      );
+    }
+
+    if (!openaiApiKey) {
+      console.error("[generate] OPENAI_API_KEY não configurada");
+      return NextResponse.json(
+        { error: "OPENAI_API_KEY não configurada no ambiente." },
         { status: 500 }
       );
     }
@@ -348,7 +357,7 @@ export async function POST(request: Request) {
     const textTimeout = setTimeout(() => textController.abort(), 15000);
 
     const textResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -444,99 +453,51 @@ export async function POST(request: Request) {
     // Agora, gerar a imagem do post usando o modelo de imagem
     const imagePrompt = buildImagePrompt(payload, postText);
 
-    // Usar gemini-3-pro-image-preview se houver imagem de inspiração ou logo
-    const hasLogo = !!(payload.onboarding as Record<string, unknown>)?.logo_url;
-    const finalImageModel = (payload.inspirationImage || hasLogo)
-      ? "gemini-3-pro-image-preview" 
-      : imageModel;
+    // Usar sempre o modelo de imagem configurado (dall-e-3 por padrão)
+    const finalImageModel = imageModel;
 
     try {
-      // Preparar as partes da requisição
-      const parts: any[] = [{ text: imagePrompt }];
+      // A OpenAI não suporta imagens de inspiração da mesma forma que o Gemini
+      // Vamos incluir informações sobre logo/imagem de inspiração no prompt de texto
+      let enhancedPrompt = imagePrompt;
       
-      // Se houver logo, buscar e adicionar às partes (com timeout)
       const logoUrl = (payload.onboarding as Record<string, unknown>)?.logo_url as string | undefined;
       if (logoUrl) {
-        try {
-          const logoController = new AbortController();
-          const logoTimeout = setTimeout(() => logoController.abort(), 5000); // 5 segundos para buscar logo
-          
-          const logoResponse = await fetch(logoUrl, { signal: logoController.signal });
-          clearTimeout(logoTimeout);
-          
-          if (logoResponse.ok) {
-            const logoBuffer = await logoResponse.arrayBuffer();
-            // Limitar tamanho do logo (máximo 500KB)
-            if (logoBuffer.byteLength > 500 * 1024) {
-              console.warn("Logo muito grande, pulando:", logoBuffer.byteLength);
-            } else {
-              const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-              const contentType = logoResponse.headers.get('content-type') || 'image/png';
-              parts.push({
-                inlineData: {
-                  mimeType: contentType,
-                  data: logoBase64,
-                },
-              });
-            }
-          }
-        } catch (logoError) {
-          console.warn("Erro ao buscar logo (continuando sem logo):", logoError);
-          // Continuar sem logo se houver erro
-        }
+        enhancedPrompt += "\n\nIMPORTANTE: Inclua o logo da marca na imagem. O logo está disponível em: " + logoUrl;
       }
       
-      // Se houver imagem de inspiração, adicionar ela às partes (validar tamanho)
       if (payload.inspirationImage) {
-        // Extrair base64 e mimeType do data URL
-        const match = payload.inspirationImage.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          const [, mimeType, base64Data] = match;
-          // Limitar tamanho da imagem de inspiração (máximo 1MB em base64 = ~750KB real)
-          if (base64Data.length > 1000000) {
-            console.warn("Imagem de inspiração muito grande, pulando:", base64Data.length);
-          } else {
-            parts.push({
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data,
-              },
-            });
-          }
-        }
+        enhancedPrompt += "\n\nIMPORTANTE: Use esta imagem como referência visual e estilo para criar uma imagem similar, mas única e original.";
       }
 
-      // Timeout dinâmico: 25s para gemini-3-pro-image-preview (mais lento, mas dentro do limite do Netlify de 26s), 20s para outros modelos
-      // O script de teste usa 30s e funciona localmente, mas no Netlify temos limite de 26s
-      const imageTimeoutDuration = finalImageModel === "gemini-3-pro-image-preview" ? 25000 : 20000;
+      // Timeout de 25s para OpenAI (dentro do limite do Netlify de 26s)
+      const imageTimeoutDuration = 25000;
       const imageController = new AbortController();
       const imageTimeout = setTimeout(() => imageController.abort(), imageTimeoutDuration);
       
-      console.log(`[generate] Usando modelo ${finalImageModel} com timeout de ${imageTimeoutDuration}ms`);
+      console.log(`[generate] Usando modelo OpenAI ${finalImageModel} com timeout de ${imageTimeoutDuration}ms`);
 
       let imageResponse: Response;
       try {
         const requestBody = {
-          contents: [
-            {
-              role: "user",
-              parts: parts,
-            },
-          ],
-          generationConfig: {
-            temperature: 0.85,
-            topP: 0.95,
-          },
+          model: finalImageModel,
+          prompt: enhancedPrompt,
+          size: "1024x1024",
+          quality: "standard",
+          n: 1,
         };
         
-        console.log(`[generate] Enviando requisição para ${finalImageModel} com ${parts.length} partes`);
-        console.log(`[generate] Tamanho do payload: ${JSON.stringify(requestBody).length} caracteres`);
+        console.log(`[generate] Enviando requisição para OpenAI ${finalImageModel}`);
+        console.log(`[generate] Tamanho do prompt: ${enhancedPrompt.length} caracteres`);
         
         imageResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
+          `https://api.openai.com/v1/images/generations`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${openaiApiKey}`,
+            },
             body: JSON.stringify(requestBody),
             signal: imageController.signal,
           }
@@ -586,21 +547,20 @@ export async function POST(request: Request) {
           console.error("[generate] Erro ao fazer parse do JSON de erro:", errorText.substring(0, 500));
         }
         
-        console.error(`[generate] Gemini Image API error (${finalImageModel}):`, {
+        console.error(`[generate] OpenAI Image API error (${finalImageModel}):`, {
           status: imageResponse.status,
           statusText: imageResponse.statusText,
           error: errorData,
         });
         
-        const errorMessage = errorData?.error?.message || `Erro na API do Gemini: ${imageResponse.status}`;
+        const errorMessage = errorData?.error?.message || errorData?.message || `Erro na API da OpenAI: ${imageResponse.status}`;
         
         // Verificar se é erro de quota/limite
         const isQuotaExceeded = 
           errorMessage.includes("quota") || 
           errorMessage.includes("Quota exceeded") ||
           errorMessage.includes("rate limit") ||
-          errorMessage.includes("RESOURCE_EXHAUSTED") ||
-          errorMessage.includes("resource exhausted") ||
+          errorMessage.includes("insufficient_quota") ||
           errorMessage.includes("limit") ||
           imageResponse.status === 429 ||
           imageResponse.status === 403;
@@ -617,7 +577,7 @@ export async function POST(request: Request) {
           
           return NextResponse.json({
             post: postText,
-            imageError: `⚠️ Limite de requisições do Gemini atingido. A imagem não pôde ser gerada, mas o texto foi criado com sucesso.${retrySeconds ? ` Tente novamente em ${Math.ceil(retrySeconds)} segundos.` : ' Tente novamente em alguns minutos.'}`,
+            imageError: `⚠️ Limite de requisições da OpenAI atingido. A imagem não pôde ser gerada, mas o texto foi criado com sucesso.${retrySeconds ? ` Tente novamente em ${Math.ceil(retrySeconds)} segundos.` : ' Tente novamente em alguns minutos.'}`,
             quotaExceeded: true,
             retryAfter: retrySeconds,
           });
@@ -632,17 +592,15 @@ export async function POST(request: Request) {
       const imageData = await imageResponse.json();
       
       console.log(`[generate] Resposta parseada com sucesso. Estrutura:`, {
-        hasCandidates: !!imageData?.candidates,
-        candidatesLength: imageData?.candidates?.length || 0,
+        hasData: !!imageData?.data,
+        dataLength: imageData?.data?.length || 0,
       });
       
-      // O Gemini retorna a imagem em base64 no campo inlineData
-      const imagePart = imageData?.candidates?.[0]?.content?.parts?.find(
-        (part: any) => part.inlineData
-      );
+      // A OpenAI retorna a imagem como URL no campo data[0].url
+      const imageUrlFromApi = imageData?.data?.[0]?.url;
       
-      if (!imagePart || !imagePart.inlineData) {
-        console.error("[generate] Resposta não contém imagem inline:", JSON.stringify(imageData, null, 2).substring(0, 1000));
+      if (!imageUrlFromApi) {
+        console.error("[generate] Resposta não contém URL da imagem:", JSON.stringify(imageData, null, 2).substring(0, 1000));
         await savePostToDb(payload, postText, null);
         return NextResponse.json({
           post: postText,
@@ -650,8 +608,16 @@ export async function POST(request: Request) {
         });
       }
       
-      const imageBase64 = imagePart.inlineData.data;
-      const imageMimeType = imagePart.inlineData.mimeType || 'image/png';
+      // Baixar a imagem da URL e converter para base64
+      console.log(`[generate] Baixando imagem da URL: ${imageUrlFromApi}`);
+      const imageDownloadResponse = await fetch(imageUrlFromApi);
+      if (!imageDownloadResponse.ok) {
+        throw new Error(`Erro ao baixar imagem: ${imageDownloadResponse.status}`);
+      }
+      
+      const imageBuffer = await imageDownloadResponse.arrayBuffer();
+      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      const imageMimeType = 'image/png'; // OpenAI sempre retorna PNG
       
       console.log(`[generate] Imagem extraída: ${imageBase64.length} caracteres base64, tipo: ${imageMimeType}`);
       
@@ -684,7 +650,7 @@ export async function POST(request: Request) {
         }
       }
       
-      // Gerar legenda usando gemini-2.5-flash com a imagem gerada (opcional, pode pular se demorar muito)
+      // Gerar legenda usando gemini-2.5-flash (opcional, pode pular se demorar muito)
       let caption = postText; // Fallback para o texto original
       
       // Pular geração de legenda se a imagem for muito grande (para evitar timeout)
@@ -743,7 +709,7 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
           const captionTimeout = setTimeout(() => captionController.abort(), 10000);
 
           const captionResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${geminiApiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
