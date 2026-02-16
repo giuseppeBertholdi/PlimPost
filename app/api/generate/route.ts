@@ -76,21 +76,55 @@ export async function POST(request: Request) {
     // 1. Gerar texto do post
     const textPrompt = `Crie um post curto e autêntico para Instagram (20-30 palavras) sobre: ${prompt}${payload.inspirationMessage || payload.inspirationImage ? `. Use como inspiração.` : ''}`;
 
-    const textResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: textPrompt }] }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 200 },
-        }),
-      }
-    );
+    const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiApiKey}`;
+    
+    console.log("[generate] Chamando Gemini:", { model: textModel, url: geminiUrl.replace(geminiApiKey, '***') });
+    
+    const textResponse = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: textPrompt }] }],
+        generationConfig: { temperature: 0.9, maxOutputTokens: 200 },
+      }),
+    });
 
     if (!textResponse.ok) {
+      const errorText = await textResponse.text().catch(() => '');
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        console.error("[generate] Erro ao parsear resposta de erro:", errorText.substring(0, 500));
+      }
+      
+      console.error("[generate] Erro na API do Gemini:", {
+        status: textResponse.status,
+        statusText: textResponse.statusText,
+        error: errorData,
+        model: textModel,
+        hasApiKey: !!geminiApiKey,
+        url: geminiUrl.replace(geminiApiKey, '***'),
+      });
+      
+      // Se for 404, pode ser modelo inválido
+      if (textResponse.status === 404) {
+        return NextResponse.json(
+          { 
+            error: `Modelo "${textModel}" não encontrado. Verifique se o modelo está correto nas variáveis de ambiente.`,
+            details: errorData,
+            suggestion: "Tente usar 'gemini-1.5-flash' ou verifique GEMINI_MODEL no Netlify.",
+          },
+          { status: 404 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: "Erro ao gerar texto." },
+        { 
+          error: `Erro ao gerar texto: ${errorData?.error?.message || textResponse.statusText || 'Erro desconhecido'}`,
+          details: errorData,
+        },
         { status: textResponse.status }
       );
     }
