@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "dall-e-3";
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "gpt-image-1";
 
     if (!geminiApiKey) {
       return NextResponse.json(

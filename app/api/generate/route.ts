@@ -241,7 +241,7 @@ export async function POST(request: Request) {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "dall-e-3";
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "gpt-image-1";
     const captionModel = process.env.GEMINI_CAPTION_MODEL || "gemini-2.5-flash";
 
     if (!geminiApiKey) {
@@ -473,7 +473,7 @@ export async function POST(request: Request) {
     // Agora, gerar a imagem do post usando o modelo de imagem
     const imagePrompt = buildImagePrompt(payload, postText);
 
-    // Usar sempre o modelo de imagem configurado (dall-e-3 por padrão)
+    // Usar sempre o modelo de imagem configurado (gpt-image-1 por padrão)
     const finalImageModel = imageModel;
 
     try {
@@ -571,9 +571,23 @@ export async function POST(request: Request) {
           status: imageResponse.status,
           statusText: imageResponse.statusText,
           error: errorData,
+          errorText: errorText.substring(0, 1000),
+          model: finalImageModel,
+          hasApiKey: !!openaiApiKey,
         });
         
         const errorMessage = errorData?.error?.message || errorData?.message || `Erro na API da OpenAI: ${imageResponse.status}`;
+        
+        // Verificar se o modelo não existe ou está indisponível
+        if (errorMessage.includes("model") && (errorMessage.includes("not found") || errorMessage.includes("invalid") || errorMessage.includes("unavailable"))) {
+          console.error(`[generate] Modelo ${finalImageModel} não encontrado ou indisponível`);
+          await savePostToDb(payload, postText, null);
+          return NextResponse.json({
+            post: postText,
+            imageError: `O modelo de imagem ${finalImageModel} não está disponível. Verifique se o modelo está correto ou tente novamente mais tarde.`,
+            modelUnavailable: true,
+          });
+        }
         
         // Verificar se é erro de quota/limite
         const isQuotaExceeded = 
@@ -832,8 +846,30 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       console.error("[generate] Detalhes do erro:", {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500), // Primeiros 500 chars do stack
+        stack: error.stack?.substring(0, 1000), // Primeiros 1000 chars do stack
       });
+      
+      // Verificar se é erro de timeout ou conexão
+      if (error.message.includes('timeout') || error.message.includes('aborted') || error.name === 'AbortError') {
+        return NextResponse.json(
+          {
+            error: "A requisição demorou muito para ser processada. Tente novamente com um tema mais simples ou sem imagem de inspiração.",
+            timeout: true,
+          },
+          { status: 504 }
+        );
+      }
+      
+      // Verificar se é erro de rede
+      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          {
+            error: "Erro de conexão com o servidor. Verifique sua conexão e tente novamente.",
+            networkError: true,
+          },
+          { status: 502 }
+        );
+      }
     }
     
     // Verificar se foi timeout ou abort
