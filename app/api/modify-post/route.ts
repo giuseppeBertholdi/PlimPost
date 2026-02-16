@@ -294,7 +294,7 @@ export async function POST(request: Request) {
             model: imageModel,
             prompt: enhancedPrompt,
             size: "1024x1024",
-            quality: "standard",
+            quality: "high",
             n: 1,
           }),
           signal: imageController.signal,
