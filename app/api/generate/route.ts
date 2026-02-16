@@ -464,31 +464,52 @@ export async function POST(request: Request) {
     // Primeiro, gerar o texto do post
     const prompt = buildPrompt(payload);
 
-    // Timeout de 18 segundos para a requisição de texto (Netlify tem timeout de 10s, mas com edge functions pode ser maior)
+    // Timeout de 8 segundos para a requisição de texto (geralmente é rápido)
     const textController = new AbortController();
-    const textTimeout = setTimeout(() => textController.abort(), 18000);
+    const textTimeout = setTimeout(() => {
+      console.warn("⏱️ Timeout de texto atingido (8s), abortando...");
+      textController.abort();
+    }, 8000);
 
-    const textResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }],
+    let textResponse: Response;
+    try {
+      textResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: prompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.9,
+              topP: 0.95,
+              maxOutputTokens: 400,
             },
-          ],
-          generationConfig: {
-            temperature: 0.9,
-            topP: 0.95,
-            maxOutputTokens: 400,
+          }),
+          signal: textController.signal,
+        }
+      );
+      clearTimeout(textTimeout);
+    } catch (fetchError) {
+      clearTimeout(textTimeout);
+      // Se foi um AbortError, tratar como timeout
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error("⏱️ Requisição de texto abortada por timeout");
+        return NextResponse.json(
+          {
+            error: "Timeout ao gerar o texto do post (demorou mais de 8 segundos). Tente novamente.",
+            timeout: true,
           },
-        }),
-        signal: textController.signal,
+          { status: 504 }
+        );
       }
-    ).finally(() => clearTimeout(textTimeout));
+      throw fetchError;
+    }
 
     if (!textResponse.ok) {
       // Verificar se foi timeout
@@ -605,30 +626,52 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 18 segundos para a requisição de imagem
+      // Timeout de 22 segundos para a requisição de imagem (mais tempo para processar imagens com logo/inspiração)
+      // Não usar AbortController muito cedo para evitar cancelar requisições válidas
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 18000);
+      const imageTimeout = setTimeout(() => {
+        console.warn("⏱️ Timeout de imagem atingido (22s), abortando...");
+        imageController.abort();
+      }, 22000);
 
-      const imageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: parts,
+      let imageResponse: Response;
+      try {
+        imageResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: parts,
+                },
+              ],
+              generationConfig: {
+                temperature: 0.85,
+                topP: 0.95,
               },
-            ],
-            generationConfig: {
-              temperature: 0.85,
-              topP: 0.95,
-            },
-          }),
-          signal: imageController.signal,
+            }),
+            signal: imageController.signal,
+          }
+        );
+        clearTimeout(imageTimeout);
+      } catch (fetchError) {
+        clearTimeout(imageTimeout);
+        // Se foi um AbortError, tratar como timeout
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.error("⏱️ Requisição de imagem abortada por timeout");
+          // Salvar post (só texto) na galeria mesmo quando a imagem falha por timeout
+          await savePostToDb(payload, postText, null);
+          return NextResponse.json({
+            post: postText,
+            imageError: "Timeout ao gerar a imagem (demorou mais de 22 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
+            timeout: true,
+          });
         }
-      ).finally(() => clearTimeout(imageTimeout));
+        throw fetchError;
+      }
 
       if (!imageResponse.ok) {
         // Verificar se foi timeout
@@ -741,41 +784,58 @@ IMPORTANTE: Gere uma legenda COMPLETA e DESENVOLVIDA. Não seja breve demais. A 
 Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 `.trim();
 
-          // Timeout de 15 segundos para a requisição de legenda
+          // Timeout de 10 segundos para a requisição de legenda (opcional, pode ser pulado se necessário)
           const captionController = new AbortController();
-          const captionTimeout = setTimeout(() => captionController.abort(), 15000);
+          const captionTimeout = setTimeout(() => {
+            console.warn("⏱️ Timeout de legenda atingido (10s), abortando...");
+            captionController.abort();
+          }, 10000);
 
-          const captionResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    role: "user",
-                    parts: [
-                      { text: captionPrompt },
-                      {
-                        inlineData: {
-                          mimeType: imageMimeType,
-                          data: imageBase64,
+          let captionResponse: Response | null = null;
+          try {
+            captionResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [
+                        { text: captionPrompt },
+                        {
+                          inlineData: {
+                            mimeType: imageMimeType,
+                            data: imageBase64,
+                          },
                         },
-                      },
-                    ],
+                      ],
+                    },
+                  ],
+                  generationConfig: {
+                    temperature: 0.8,
+                    topP: 0.95,
+                    maxOutputTokens: 5000,
                   },
-                ],
-                generationConfig: {
-                  temperature: 0.8,
-                  topP: 0.95,
-                  maxOutputTokens: 5000,
-                },
-              }),
-              signal: captionController.signal,
+                }),
+                signal: captionController.signal,
+              }
+            );
+            clearTimeout(captionTimeout);
+          } catch (fetchError) {
+            clearTimeout(captionTimeout);
+            // Se foi um AbortError, usar o texto original como fallback
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+              console.warn("⏱️ Requisição de legenda abortada por timeout, usando texto original");
+              caption = postText; // Usar texto original como fallback
+              captionResponse = null; // Marcar como não OK para pular o processamento
+            } else {
+              throw fetchError;
             }
-          ).finally(() => clearTimeout(captionTimeout));
+          }
 
-          if (captionResponse.ok) {
+          if (captionResponse && captionResponse.ok) {
             const captionData = await captionResponse.json();
             const generatedCaption = captionData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
             if (generatedCaption) {
@@ -783,10 +843,14 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
             }
           } else {
             console.warn("Falha ao gerar legenda, usando texto original");
+            if (!caption) {
+              caption = postText; // Garantir que temos um texto
+            }
           }
         } catch (captionError) {
           console.warn("Erro ao gerar legenda:", captionError);
           // Continua com o texto original como fallback
+          caption = postText;
         }
       }
       
@@ -811,6 +875,18 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       return NextResponse.json(responseData);
     } catch (imageError) {
       console.error("Error generating image:", imageError);
+      
+      // Verificar se foi um AbortError (timeout)
+      if (imageError instanceof Error && (imageError.name === 'AbortError' || imageError.message.includes('aborted'))) {
+        console.warn("⏱️ Geração de imagem abortada por timeout");
+        await savePostToDb(payload, postText, null);
+        return NextResponse.json({ 
+          post: postText,
+          imageError: "Timeout ao gerar a imagem (demorou mais de 22 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
+          timeout: true,
+        });
+      }
+      
       await savePostToDb(payload, postText, null);
       // Se falhar a imagem, retorna pelo menos o texto
       return NextResponse.json({ 
