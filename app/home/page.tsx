@@ -642,7 +642,7 @@ export default function HomePage() {
         controller.abort();
       }, 60000);
 
-      // Criar job (modo assíncrono)
+      // Chamada direta à API (modo síncrono simplificado)
       let response: Response;
       try {
         response = await fetch("/api/generate", {
@@ -678,71 +678,10 @@ export default function HomePage() {
           }
           throw new Error(errorData.error || "Créditos insuficientes");
         }
-        throw new Error(errorData?.error || "Erro ao criar job de geração.");
+        throw new Error(errorData?.error || "Erro ao gerar post.");
       }
 
-      const jobData = await response.json();
-      const jobId = jobData.jobId;
-
-      if (!jobId) {
-        throw new Error("Job ID não retornado pela API.");
-      }
-
-      console.log("📋 Job criado:", jobId);
-
-      // Iniciar processamento do job (chamada assíncrona, não espera resposta)
-      fetch("/api/jobs/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      }).catch(err => {
-        console.warn("Erro ao iniciar processamento (pode ser processado por cron):", err);
-      });
-
-      // Fazer polling do status do job
-      const pollInterval = 2000; // 2 segundos
-      const maxPollTime = 300000; // 5 minutos máximo
-      const startTime = Date.now();
-      let pollCount = 0;
-
-      const pollJobStatus = async (): Promise<any> => {
-        if (Date.now() - startTime > maxPollTime) {
-          throw new Error("Tempo máximo de espera excedido. O processamento está demorando mais que o esperado.");
-        }
-
-        try {
-          const statusResponse = await fetch(`/api/jobs/${jobId}`);
-          if (!statusResponse.ok) {
-            throw new Error(`Erro ao consultar status do job: ${statusResponse.status}`);
-          }
-
-          const statusData = await statusResponse.json();
-          pollCount++;
-          console.log(`🔄 Polling #${pollCount} - Status: ${statusData.status}`);
-
-          if (statusData.status === "completed") {
-            return statusData.result;
-          } else if (statusData.status === "failed") {
-            throw new Error(statusData.error_message || "Erro ao processar o job.");
-          } else if (statusData.status === "pending" || statusData.status === "processing") {
-            // Continuar polling
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            return pollJobStatus();
-          } else {
-            throw new Error(`Status desconhecido: ${statusData.status}`);
-          }
-        } catch (error) {
-          if (error instanceof Error && error.message.includes("Tempo máximo")) {
-            throw error;
-          }
-          // Em caso de erro de rede, tentar novamente após um delay
-          console.warn("Erro ao consultar status, tentando novamente...", error);
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
-          return pollJobStatus();
-        }
-      };
-
-      // Iniciar polling
-      const result = await pollJobStatus();
+      const result = await response.json();
 
       console.log("✨ Resultado recebido:", { 
         hasPost: !!result.post, 
