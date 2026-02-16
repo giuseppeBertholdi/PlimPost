@@ -1,0 +1,7 @@
+# Deno
+.deno/
+
+# Environment
+.env
+.env.local
+

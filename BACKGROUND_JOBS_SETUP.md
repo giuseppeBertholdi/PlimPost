@@ -44,9 +44,20 @@ WORKER_SECRET_TOKEN=seu-token-secreto-aqui
 
 Se não configurar, o endpoint ainda funcionará, mas será público.
 
-### 3. Processar Jobs
+### 3. Configurar Worker (OBRIGATÓRIO)
 
-Você tem 3 opções para processar os jobs:
+⚠️ **IMPORTANTE**: Sem o worker, os jobs ficam eternamente em `pending`!
+
+O worker é um processo que roda continuamente processando jobs. Veja `WORKER_SETUP.md` para instruções detalhadas.
+
+**Opções rápidas**:
+- **Railway** (recomendado): Mais fácil, grátis até 500h/mês
+- **Render**: Grátis, fácil configuração
+- **VPS**: Mais controle, $5-10/mês
+
+### 4. Processar Jobs (Alternativa - Não Recomendado)
+
+Se não puder rodar um worker dedicado, você pode usar cron jobs (menos confiável):
 
 #### Opção A: Chamada Automática (Já implementado)
 O frontend já chama `/api/jobs/process` automaticamente após criar um job. Isso funciona bem para baixo volume.

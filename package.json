@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "fonts": "node scripts/generate-fonts-from-api.js"
+    "fonts": "node scripts/generate-fonts-from-api.js",
+    "worker": "tsx workers/process-jobs.ts",
+    "worker:watch": "tsx watch workers/process-jobs.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
@@ -25,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
