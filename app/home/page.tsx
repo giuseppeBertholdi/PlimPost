@@ -642,13 +642,14 @@ export default function HomePage() {
         controller.abort();
       }, 60000);
 
+      // Criar job (modo assíncrono)
       let response: Response;
       try {
         response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-          signal: controller.signal, // Adicionar o signal para permitir cancelamento
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
         });
         clearTimeout(timeoutId);
       } catch (fetchError) {
@@ -659,63 +660,11 @@ export default function HomePage() {
         throw fetchError;
       }
 
-      console.log("📡 Resposta recebida:", { 
-        status: response.status, 
-        ok: response.ok,
-        contentType: response.headers.get("content-type")
-      });
-
-      // Verificar se a resposta é JSON antes de fazer o parse
-      const contentType = response.headers.get("content-type");
-      let data: any;
-      
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-        console.log("✅ JSON parseado com sucesso:", { 
-          hasPost: !!data.post, 
-          hasImage: !!(data.image || data.imageUrl),
-          postLength: data.post?.length || 0
-        });
-      } else {
-        // Se não for JSON, tentar ler como texto para debug
-        const text = await response.text();
-        console.error("❌ Resposta não é JSON:", text.substring(0, 500));
-        throw new Error(
-          response.status === 404
-            ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
-            : `Erro no servidor (${response.status}). Tente novamente mais tarde.`
-        );
-      }
-
       if (!response.ok) {
-        console.error("❌ Resposta não OK:", { status: response.status, data });
-        // Handle timeout errors (504 Gateway Timeout)
-        if (response.status === 504 || data?.timeout) {
-          const timeoutMessage = data?.error || 
-            "A geração do post está demorando mais que o esperado. Isso pode acontecer quando há muitas requisições simultâneas ou quando a API do Gemini está lenta. Tente novamente em alguns instantes.";
-          throw new Error(timeoutMessage);
-        }
-        // Handle bad gateway errors (502)
-        if (response.status === 502 || data?.serverError || data?.networkError) {
-          const serverErrorMessage = data?.error || 
-            "O servidor está temporariamente indisponível ou houve um erro ao processar sua requisição. Isso pode ser causado por:\n" +
-            "• Limite de tempo do servidor excedido\n" +
-            "• Problemas temporários com a API do Gemini\n" +
-            "• Sobrecarga do servidor\n\n" +
-            "Por favor, tente novamente em alguns instantes. Se o problema persistir, tente simplificar sua solicitação (remover imagem de inspiração ou reduzir informações adicionais).";
-          throw new Error(serverErrorMessage);
-        }
-        // Handle quota exceeded errors with retry information
-        if (data?.quotaExceeded) {
-          const retryInfo = data.retryAfter 
-            ? ` Tente novamente em aproximadamente ${Math.ceil(data.retryAfter)} segundos.`
-            : "";
-          throw new Error(data.error + retryInfo);
-        }
+        const errorData = await response.json().catch(() => ({}));
         // Handle insufficient credits
-        if (data?.insufficientCredits || response.status === 402) {
-          setErrorMessage(data.error || "Créditos insuficientes. Compre mais créditos para continuar gerando posts.");
-          // Recarregar créditos
+        if (errorData?.insufficientCredits || response.status === 402) {
+          setErrorMessage(errorData.error || "Créditos insuficientes. Compre mais créditos para continuar gerando posts.");
           if (user?.id) {
             try {
               const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
@@ -727,38 +676,93 @@ export default function HomePage() {
               console.error("Erro ao recarregar créditos:", err);
             }
           }
-          throw new Error(data.error || "Créditos insuficientes");
+          throw new Error(errorData.error || "Créditos insuficientes");
         }
-        throw new Error(data?.error || "Erro ao gerar o post.");
+        throw new Error(errorData?.error || "Erro ao criar job de geração.");
       }
 
-      // Verificar se temos dados válidos
-      if (!data.post && !data.image && !data.imageUrl) {
-        console.error("⚠️ Resposta OK mas sem dados:", data);
-        throw new Error("A API retornou sucesso, mas não gerou nenhum conteúdo. Tente novamente.");
+      const jobData = await response.json();
+      const jobId = jobData.jobId;
+
+      if (!jobId) {
+        throw new Error("Job ID não retornado pela API.");
       }
 
-      console.log("✨ Definindo resultados:", { 
-        postLength: data.post?.length || 0,
-        hasImage: !!(data.image || data.imageUrl),
-        imageType: data.image ? 'base64' : data.imageUrl ? 'url' : 'none'
+      console.log("📋 Job criado:", jobId);
+
+      // Iniciar processamento do job (chamada assíncrona, não espera resposta)
+      fetch("/api/jobs/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }).catch(err => {
+        console.warn("Erro ao iniciar processamento (pode ser processado por cron):", err);
       });
 
-      setGeneratedPost(data.post ?? "");
-      // Usar imageUrl se disponível (imagem salva), senão usar base64
-      setGeneratedImage(data.imageUrl ?? data.image ?? null);
+      // Fazer polling do status do job
+      const pollInterval = 2000; // 2 segundos
+      const maxPollTime = 300000; // 5 minutos máximo
+      const startTime = Date.now();
+      let pollCount = 0;
+
+      const pollJobStatus = async (): Promise<any> => {
+        if (Date.now() - startTime > maxPollTime) {
+          throw new Error("Tempo máximo de espera excedido. O processamento está demorando mais que o esperado.");
+        }
+
+        try {
+          const statusResponse = await fetch(`/api/jobs/${jobId}`);
+          if (!statusResponse.ok) {
+            throw new Error(`Erro ao consultar status do job: ${statusResponse.status}`);
+          }
+
+          const statusData = await statusResponse.json();
+          pollCount++;
+          console.log(`🔄 Polling #${pollCount} - Status: ${statusData.status}`);
+
+          if (statusData.status === "completed") {
+            return statusData.result;
+          } else if (statusData.status === "failed") {
+            throw new Error(statusData.error_message || "Erro ao processar o job.");
+          } else if (statusData.status === "pending" || statusData.status === "processing") {
+            // Continuar polling
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            return pollJobStatus();
+          } else {
+            throw new Error(`Status desconhecido: ${statusData.status}`);
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("Tempo máximo")) {
+            throw error;
+          }
+          // Em caso de erro de rede, tentar novamente após um delay
+          console.warn("Erro ao consultar status, tentando novamente...", error);
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          return pollJobStatus();
+        }
+      };
+
+      // Iniciar polling
+      const result = await pollJobStatus();
+
+      console.log("✨ Resultado recebido:", { 
+        hasPost: !!result.post, 
+        hasImage: !!(result.image || result.imageUrl),
+        postLength: result.post?.length || 0
+      });
+
+      setGeneratedPost(result.post ?? "");
+      setGeneratedImage(result.imageUrl ?? result.image ?? null);
       
-      // Processar erro de imagem se houver
-      if (data.imageError) {
-        setImageError(data.imageError);
+      if (result.imageError) {
+        setImageError(result.imageError);
       } else {
         setImageError(null);
       }
       
       console.log("✅ Estados atualizados:", { 
-        generatedPost: !!data.post, 
-        generatedImage: !!(data.imageUrl || data.image),
-        imageError: data.imageError || null
+        generatedPost: !!result.post, 
+        generatedImage: !!(result.imageUrl || result.image),
+        imageError: result.imageError || null
       });
       
       // Inicializar chat com mensagem de boas-vindas
