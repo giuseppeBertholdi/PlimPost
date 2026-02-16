@@ -240,7 +240,7 @@ export async function POST(request: Request) {
     
     const apiKey = process.env.GEMINI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+    const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash";
     const captionModel = process.env.GEMINI_CAPTION_MODEL || "gemini-2.5-flash";
 
     if (!apiKey) {
@@ -444,8 +444,11 @@ export async function POST(request: Request) {
     // Agora, gerar a imagem do post usando o modelo de imagem
     const imagePrompt = buildImagePrompt(payload, postText);
 
-    // Sempre usar gemini-2.5-flash-image (suporta logo e imagem de inspiração)
-    const finalImageModel = imageModel; // gemini-2.5-flash-image
+    // Usar gemini-3-pro-image-preview se houver imagem de inspiração ou logo
+    const hasLogo = !!(payload.onboarding as Record<string, unknown>)?.logo_url;
+    const finalImageModel = (payload.inspirationImage || hasLogo)
+      ? "gemini-3-pro-image-preview" 
+      : imageModel;
 
     try {
       // Preparar as partes da requisição
