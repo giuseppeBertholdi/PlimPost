@@ -6,6 +6,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 26; // Netlify permite até 26 segundos no plano gratuito
 
+// Limite de tamanho do payload (em bytes) - Netlify tem limite de ~6MB
+const MAX_PAYLOAD_SIZE = 5 * 1024 * 1024; // 5MB
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -248,11 +251,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse do payload com tratamento de erro
+    // Parse do payload com tratamento de erro e validação de tamanho
     let payload: GeneratePayload;
     try {
+      // Verificar tamanho do conteúdo antes de fazer parse
+      const contentLength = request.headers.get('content-length');
+      if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_SIZE) {
+        console.error("[generate] Payload muito grande:", contentLength);
+        return NextResponse.json(
+          { error: "O payload da requisição é muito grande. Reduza o tamanho da imagem de inspiração." },
+          { status: 413 }
+        );
+      }
+      
       payload = await request.json() as GeneratePayload;
       console.log("[generate] Payload parseado com sucesso");
+      
+      // Validar tamanho da imagem de inspiração se existir
+      if (payload.inspirationImage && payload.inspirationImage.length > MAX_PAYLOAD_SIZE) {
+        console.warn("[generate] Imagem de inspiração muito grande, removendo do payload");
+        payload.inspirationImage = undefined;
+      }
     } catch (parseError) {
       console.error("[generate] Erro ao fazer parse do JSON:", parseError);
       return NextResponse.json(
@@ -324,9 +343,9 @@ export async function POST(request: Request) {
     // Primeiro, gerar o texto do post
     const prompt = buildPrompt(payload);
 
-    // Timeout de 18 segundos para a requisição de texto (Netlify tem timeout de 10s, mas com edge functions pode ser maior)
+    // Timeout de 15 segundos para a requisição de texto (reduzido para deixar mais tempo para imagem)
     const textController = new AbortController();
-    const textTimeout = setTimeout(() => textController.abort(), 18000);
+    const textTimeout = setTimeout(() => textController.abort(), 15000);
 
     const textResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
@@ -435,45 +454,61 @@ export async function POST(request: Request) {
       // Preparar as partes da requisição
       const parts: any[] = [{ text: imagePrompt }];
       
-      // Se houver logo, buscar e adicionar às partes
+      // Se houver logo, buscar e adicionar às partes (com timeout)
       const logoUrl = (payload.onboarding as Record<string, unknown>)?.logo_url as string | undefined;
       if (logoUrl) {
         try {
-          const logoResponse = await fetch(logoUrl);
+          const logoController = new AbortController();
+          const logoTimeout = setTimeout(() => logoController.abort(), 5000); // 5 segundos para buscar logo
+          
+          const logoResponse = await fetch(logoUrl, { signal: logoController.signal });
+          clearTimeout(logoTimeout);
+          
           if (logoResponse.ok) {
             const logoBuffer = await logoResponse.arrayBuffer();
-            const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-            const contentType = logoResponse.headers.get('content-type') || 'image/png';
-            parts.push({
-              inlineData: {
-                mimeType: contentType,
-                data: logoBase64,
-              },
-            });
+            // Limitar tamanho do logo (máximo 500KB)
+            if (logoBuffer.byteLength > 500 * 1024) {
+              console.warn("Logo muito grande, pulando:", logoBuffer.byteLength);
+            } else {
+              const logoBase64 = Buffer.from(logoBuffer).toString('base64');
+              const contentType = logoResponse.headers.get('content-type') || 'image/png';
+              parts.push({
+                inlineData: {
+                  mimeType: contentType,
+                  data: logoBase64,
+                },
+              });
+            }
           }
         } catch (logoError) {
-          console.warn("Erro ao buscar logo:", logoError);
+          console.warn("Erro ao buscar logo (continuando sem logo):", logoError);
+          // Continuar sem logo se houver erro
         }
       }
       
-      // Se houver imagem de inspiração, adicionar ela às partes
+      // Se houver imagem de inspiração, adicionar ela às partes (validar tamanho)
       if (payload.inspirationImage) {
         // Extrair base64 e mimeType do data URL
         const match = payload.inspirationImage.match(/^data:([^;]+);base64,(.+)$/);
         if (match) {
           const [, mimeType, base64Data] = match;
-          parts.push({
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data,
-            },
-          });
+          // Limitar tamanho da imagem de inspiração (máximo 1MB em base64 = ~750KB real)
+          if (base64Data.length > 1000000) {
+            console.warn("Imagem de inspiração muito grande, pulando:", base64Data.length);
+          } else {
+            parts.push({
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data,
+              },
+            });
+          }
         }
       }
 
-      // Timeout de 25 segundos para a requisição de imagem (aumentado para evitar abortos prematuros)
+      // Timeout de 20 segundos para a requisição de imagem (deixar margem para o Netlify)
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 25000);
+      const imageTimeout = setTimeout(() => imageController.abort(), 20000);
 
       let imageResponse: Response;
       try {
@@ -604,10 +639,13 @@ export async function POST(request: Request) {
         }
       }
       
-      // Gerar legenda usando gemini-2.5-flash com a imagem gerada
+      // Gerar legenda usando gemini-2.5-flash com a imagem gerada (opcional, pode pular se demorar muito)
       let caption = postText; // Fallback para o texto original
       
-      if (imageBase64) {
+      // Pular geração de legenda se a imagem for muito grande (para evitar timeout)
+      const shouldGenerateCaption = imageBase64 && imageBase64.length < 2000000; // ~1.5MB em base64
+      
+      if (shouldGenerateCaption) {
         try {
           const tones = payload.onboarding.tone_tags?.join(", ") || "Neutro";
           const captionPrompt = `
@@ -655,9 +693,9 @@ IMPORTANTE: Gere uma legenda COMPLETA e DESENVOLVIDA. Não seja breve demais. A 
 Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
 `.trim();
 
-          // Timeout de 15 segundos para a requisição de legenda
+          // Timeout de 10 segundos para a requisição de legenda (reduzido para evitar timeout total)
           const captionController = new AbortController();
-          const captionTimeout = setTimeout(() => captionController.abort(), 15000);
+          const captionTimeout = setTimeout(() => captionController.abort(), 10000);
 
           const captionResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${captionModel}:generateContent?key=${apiKey}`,
