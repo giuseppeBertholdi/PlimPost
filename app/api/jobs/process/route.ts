@@ -70,26 +70,28 @@ export async function POST(request: Request) {
     processJob(job.id, payload).catch(error => {
       console.error(`[jobs/process] Erro ao processar job ${job.id} em background:`, error);
       // O processJob já atualiza o status para failed, mas garantimos aqui também
-      try {
-        supabaseAdmin
-          .from("generation_jobs")
-          .select("status")
-          .eq("id", job.id)
-          .single()
-          .then(({ data: currentJob }) => {
-            if (currentJob?.status === "processing") {
-              supabaseAdmin
-                .from("generation_jobs")
-                .update({
-                  status: "failed",
-                  error_message: error instanceof Error ? error.message : "Erro ao processar job",
-                  completed_at: new Date().toISOString(),
-                })
-                .eq("id", job.id);
-            }
-          });
-      } catch (updateError) {
-        console.error(`[jobs/process] Erro ao atualizar job ${job.id} para failed:`, updateError);
+      if (supabaseAdmin) {
+        try {
+          supabaseAdmin
+            .from("generation_jobs")
+            .select("status")
+            .eq("id", job.id)
+            .single()
+            .then(({ data: currentJob }) => {
+              if (currentJob?.status === "processing" && supabaseAdmin) {
+                supabaseAdmin
+                  .from("generation_jobs")
+                  .update({
+                    status: "failed",
+                    error_message: error instanceof Error ? error.message : "Erro ao processar job",
+                    completed_at: new Date().toISOString(),
+                  })
+                  .eq("id", job.id);
+              }
+            });
+        } catch (updateError) {
+          console.error(`[jobs/process] Erro ao atualizar job ${job.id} para failed:`, updateError);
+        }
       }
     });
 
