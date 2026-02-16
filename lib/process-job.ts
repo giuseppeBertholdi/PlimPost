@@ -12,14 +12,16 @@ export async function processJob(jobId: string, payload: GeneratePayload) {
 
   if (!geminiApiKey || !openaiApiKey || !supabaseAdmin) {
     // Atualizar status para failed antes de lançar erro
-    await supabaseAdmin
-      .from("generation_jobs")
-      .update({
-        status: "failed",
-        error_message: "APIs não configuradas",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
+    if (supabaseAdmin) {
+      await supabaseAdmin
+        .from("generation_jobs")
+        .update({
+          status: "failed",
+          error_message: "APIs não configuradas",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    }
     throw new Error("APIs não configuradas");
   }
 
