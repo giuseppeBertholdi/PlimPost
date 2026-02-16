@@ -370,6 +370,9 @@ IMPORTANTE: Siga EXATAMENTE estas regras. A imagem deve ser PRIMARIAMENTE VISUAL
 };
 
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  console.time("⏱️ Total da requisição");
+  
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
@@ -385,6 +388,12 @@ export async function POST(request: Request) {
     }
 
     const payload = (await request.json()) as GeneratePayload;
+    
+    console.log("📥 Payload recebido:", {
+      hasLogo: !!payload.logoUrl,
+      hasInspiration: !!payload.inspirationImage,
+      inspirationSize: payload.inspirationImage?.length || 0,
+    });
 
     if (!payload?.businessName || !payload?.mainTheme || !payload?.objective) {
       return NextResponse.json(
@@ -565,11 +574,13 @@ export async function POST(request: Request) {
     // Agora, gerar a imagem do post usando o modelo de imagem
     const imagePrompt = buildImagePrompt(payload, postText);
 
-    // Usar gemini-3-pro-image-preview se houver imagem de inspiração ou logo
-    const hasLogo = !!payload.logoUrl;
-    const finalImageModel = (payload.inspirationImage || hasLogo)
-      ? "gemini-3-pro-image-preview" 
-      : imageModel;
+    // SEMPRE usar modelo flash (mais rápido e estável) - gemini-3-pro-image-preview é muito lento
+    // Se precisar de logo ou inspiração, o flash também suporta
+    const finalImageModel = imageModel; // Sempre usar flash para evitar timeout
+    console.log("🖼️ Modelo de imagem:", finalImageModel, {
+      hasLogo: !!payload.logoUrl,
+      hasInspiration: !!payload.inspirationImage,
+    });
 
     try {
       // Preparar as partes da requisição
@@ -585,9 +596,14 @@ export async function POST(request: Request) {
             const logoBase64 = Buffer.from(logoBuffer).toString('base64');
             const contentType = logoResponse.headers.get('content-type') || 'image/png';
             
+            console.log("📎 Logo processado:", {
+              size: logoBase64.length,
+              contentType,
+            });
+            
             // Limitar tamanho do logo (se muito grande, pular)
-            if (logoBase64.length > 500000) { // ~500KB em base64
-              console.warn("Logo muito grande, pulando...");
+            if (logoBase64.length > 300000) { // ~300KB em base64 (reduzido para evitar crash de memória)
+              console.warn("⚠️ Logo muito grande, pulando para evitar timeout...");
             } else {
               parts.push({
                 inlineData: {
@@ -610,9 +626,14 @@ export async function POST(request: Request) {
           const mimeType = `image/${base64Match[1]}`;
           const base64Data = base64Match[2];
           
+          console.log("📸 Imagem de inspiração processada:", {
+            size: base64Data.length,
+            mimeType,
+          });
+          
           // Verificar tamanho (se muito grande mesmo comprimida, pular)
-          if (base64Data.length > 1000000) { // ~1MB em base64
-            console.warn("Imagem de inspiração ainda muito grande após compressão, pulando...");
+          if (base64Data.length > 500000) { // ~500KB em base64 (reduzido para evitar timeout)
+            console.warn("⚠️ Imagem de inspiração ainda muito grande após compressão, pulando para evitar timeout...");
           } else {
             parts.push({
               inlineData: {
@@ -624,13 +645,13 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 22 segundos para a requisição de imagem (mais tempo para processar imagens com logo/inspiração)
-      // Não usar AbortController muito cedo para evitar cancelar requisições válidas
+      console.time("🖼️ Geração de imagem");
+      // Timeout de 18 segundos para a requisição de imagem (dentro do limite do serverless)
       const imageController = new AbortController();
       const imageTimeout = setTimeout(() => {
-        console.warn("⏱️ Timeout de imagem atingido (22s), abortando...");
+        console.warn("⏱️ Timeout de imagem atingido (18s), abortando...");
         imageController.abort();
-      }, 22000);
+      }, 18000);
 
       let imageResponse: Response;
       try {
@@ -655,16 +676,21 @@ export async function POST(request: Request) {
           }
         );
         clearTimeout(imageTimeout);
+        console.timeEnd("🖼️ Geração de imagem");
       } catch (fetchError) {
         clearTimeout(imageTimeout);
+        console.timeEnd("🖼️ Geração de imagem");
         // Se foi um AbortError, tratar como timeout
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
           console.error("⏱️ Requisição de imagem abortada por timeout");
           // Salvar post (só texto) na galeria mesmo quando a imagem falha por timeout
           await savePostToDb(payload, postText, null);
+          const elapsed = Date.now() - startTime;
+          console.timeEnd("⏱️ Total da requisição");
+          console.log(`⏱️ Tempo total: ${elapsed}ms`);
           return NextResponse.json({
             post: postText,
-            imageError: "Timeout ao gerar a imagem (demorou mais de 22 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
+            imageError: "Timeout ao gerar a imagem (demorou mais de 18 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
             timeout: true,
           });
         }
@@ -863,16 +889,22 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
         businessName: payload.businessName
       };
 
+      const elapsed = Date.now() - startTime;
+      console.timeEnd("⏱️ Total da requisição");
       console.log("✅ Post gerado com sucesso:", {
         hasPost: !!responseData.post,
         postLength: responseData.post?.length || 0,
         hasImage: !!(responseData.image || responseData.imageUrl),
-        imageType: responseData.image ? 'base64' : responseData.imageUrl ? 'url' : 'none'
+        imageType: responseData.image ? 'base64' : responseData.imageUrl ? 'url' : 'none',
+        totalTime: `${elapsed}ms`,
       });
 
       return NextResponse.json(responseData);
     } catch (imageError) {
       console.error("Error generating image:", imageError);
+      const elapsed = Date.now() - startTime;
+      console.timeEnd("⏱️ Total da requisição");
+      console.log(`⏱️ Tempo total antes do erro: ${elapsed}ms`);
       
       // Verificar se foi um AbortError (timeout)
       if (imageError instanceof Error && (imageError.name === 'AbortError' || imageError.message.includes('aborted'))) {
@@ -880,7 +912,7 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
         await savePostToDb(payload, postText, null);
         return NextResponse.json({ 
           post: postText,
-          imageError: "Timeout ao gerar a imagem (demorou mais de 22 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
+          imageError: "Timeout ao gerar a imagem (demorou mais de 18 segundos). O texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
           timeout: true,
         });
       }
@@ -893,7 +925,10 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       });
     }
   } catch (error) {
+    const elapsed = Date.now() - startTime;
+    console.timeEnd("⏱️ Total da requisição");
     console.error("Generate API error:", error);
+    console.log(`⏱️ Tempo total antes do erro: ${elapsed}ms`);
     
     // Verificar se foi timeout ou abort
     if (error instanceof Error) {
