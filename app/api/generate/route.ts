@@ -241,10 +241,11 @@ const buildImagePrompt = (payload: GeneratePayload, postText: string) => {
 Crie uma imagem VISUALMENTE IMPACTANTE e PROFISSIONAL para post do Instagram. A IMAGEM É O FOCO PRINCIPAL, o texto é apenas complemento.
 
 ESPECIFICAÇÕES TÉCNICAS OBRIGATÓRIAS:
-- Tamanho: EXATAMENTE 1080x1080 pixels (formato quadrado 1:1)
+- Tamanho: EXATAMENTE 1080x1080 pixels (formato quadrado 1:1) - NÃO pode ser outro tamanho
 - Resolução: ALTA QUALIDADE, nítida e clara
 - Formato: PNG com fundo
 - Qualidade: pronta para publicação profissional
+- CRÍTICO: A imagem DEVE ter exatamente 1080 pixels de largura e 1080 pixels de altura (1080x1080)
 - NÃO inclua swatches de cores, códigos hexadecimais ou paletas visíveis na imagem
 - NÃO mostre códigos de cores no topo ou em qualquer lugar da imagem
 - NÃO inclua nomes de fontes na imagem (como "Open Sans", "Montserrat", etc.)
@@ -365,7 +366,12 @@ PROIBIÇÕES ABSOLUTAS NA IMAGEM:
 - A imagem deve conter APENAS o conteúdo visual do post, sem metadados ou informações técnicas
 - APENAS inclua sites, @, URLs ou informações de contato se o usuário EXPLICITAMENTE solicitar no tema central ou informações adicionais
 
-IMPORTANTE: Siga EXATAMENTE estas regras. A imagem deve ser PRIMARIAMENTE VISUAL. O texto é complemento, não o foco. Use elementos gráficos, formas, padrões, gradientes. Gere com EXATAMENTE 1080x1080 pixels, alta qualidade. A imagem final deve ser limpa, profissional e pronta para publicação, SEM qualquer referência a fontes, cores ou elementos técnicos. NÃO invente informações de contato, sites ou perfis - apenas use se o usuário pedir explicitamente.
+IMPORTANTE: Siga EXATAMENTE estas regras. A imagem deve ser PRIMARIAMENTE VISUAL. O texto é complemento, não o foco. Use elementos gráficos, formas, padrões, gradientes. 
+
+CRÍTICO - TAMANHO DA IMAGEM:
+A imagem DEVE ter EXATAMENTE 1080 pixels de largura e 1080 pixels de altura (1080x1080). NÃO pode ser outro tamanho. NÃO pode ser 1024x1024, 512x512, ou qualquer outro tamanho. DEVE ser exatamente 1080x1080 pixels.
+
+A imagem final deve ser limpa, profissional e pronta para publicação, SEM qualquer referência a fontes, cores ou elementos técnicos. NÃO invente informações de contato, sites ou perfis - apenas use se o usuário pedir explicitamente.
 `.trim();
 };
 
@@ -574,9 +580,8 @@ export async function POST(request: Request) {
     // Agora, gerar a imagem do post usando o modelo de imagem
     const imagePrompt = buildImagePrompt(payload, postText);
 
-    // SEMPRE usar modelo flash (mais rápido e estável) - gemini-3-pro-image-preview é muito lento
-    // Se precisar de logo ou inspiração, o flash também suporta
-    const finalImageModel = imageModel; // Sempre usar flash para evitar timeout
+    // Usar gemini-3-pro-image-preview (melhor qualidade, suporta logo e inspiração)
+    const finalImageModel = "gemini-3-pro-image-preview";
     console.log("🖼️ Modelo de imagem:", finalImageModel, {
       hasLogo: !!payload.logoUrl,
       hasInspiration: !!payload.inspirationImage,
