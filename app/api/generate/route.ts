@@ -506,29 +506,38 @@ export async function POST(request: Request) {
         }
       }
 
-      // Timeout de 20 segundos para a requisição de imagem (deixar margem para o Netlify)
+      // Timeout dinâmico: 25s para gemini-3-pro-image-preview (mais lento, mas dentro do limite do Netlify de 26s), 20s para outros modelos
+      // O script de teste usa 30s e funciona localmente, mas no Netlify temos limite de 26s
+      const imageTimeoutDuration = finalImageModel === "gemini-3-pro-image-preview" ? 25000 : 20000;
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 20000);
+      const imageTimeout = setTimeout(() => imageController.abort(), imageTimeoutDuration);
+      
+      console.log(`[generate] Usando modelo ${finalImageModel} com timeout de ${imageTimeoutDuration}ms`);
 
       let imageResponse: Response;
       try {
+        const requestBody = {
+          contents: [
+            {
+              role: "user",
+              parts: parts,
+            },
+          ],
+          generationConfig: {
+            temperature: 0.85,
+            topP: 0.95,
+          },
+        };
+        
+        console.log(`[generate] Enviando requisição para ${finalImageModel} com ${parts.length} partes`);
+        console.log(`[generate] Tamanho do payload: ${JSON.stringify(requestBody).length} caracteres`);
+        
         imageResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${finalImageModel}:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: parts,
-                },
-              ],
-              generationConfig: {
-                temperature: 0.85,
-                topP: 0.95,
-              },
-            }),
+            body: JSON.stringify(requestBody),
             signal: imageController.signal,
           }
         );
@@ -537,18 +546,26 @@ export async function POST(request: Request) {
         clearTimeout(imageTimeout);
         // Verificar se foi abortado por timeout
         if (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('aborted'))) {
-          console.error("Error generating image: AbortError - timeout atingido");
+          console.error(`[generate] Error generating image: AbortError - timeout de ${imageTimeoutDuration}ms atingido`);
           await savePostToDb(payload, postText, null);
           return NextResponse.json({
             post: postText,
-            imageError: "A geração da imagem demorou muito e foi interrompida. Tente novamente com uma imagem de inspiração menor ou sem imagem de inspiração.",
+            imageError: `A geração da imagem demorou mais de ${Math.round(imageTimeoutDuration / 1000)} segundos e foi interrompida. O modelo ${finalImageModel} pode estar lento. Tente novamente.`,
             timeout: true,
           });
         }
+        // Log detalhado do erro
+        console.error("[generate] Erro ao fazer fetch da imagem:", {
+          name: fetchError instanceof Error ? fetchError.name : 'Unknown',
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          model: finalImageModel,
+        });
         // Re-throw outros erros para serem capturados pelo catch externo
         throw fetchError;
       }
 
+      console.log(`[generate] Resposta recebida: ${imageResponse.status} ${imageResponse.statusText}`);
+      
       if (!imageResponse.ok) {
         // Verificar se foi timeout
         if (imageResponse.status === 0 || imageResponse.type === 'error') {
@@ -561,8 +578,19 @@ export async function POST(request: Request) {
           });
         }
         
-        const errorData = await imageResponse.json().catch(() => ({}));
-        console.error("Gemini Image API error:", imageResponse.status, errorData);
+        const errorText = await imageResponse.text().catch(() => '');
+        let errorData: any = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error("[generate] Erro ao fazer parse do JSON de erro:", errorText.substring(0, 500));
+        }
+        
+        console.error(`[generate] Gemini Image API error (${finalImageModel}):`, {
+          status: imageResponse.status,
+          statusText: imageResponse.statusText,
+          error: errorData,
+        });
         
         const errorMessage = errorData?.error?.message || `Erro na API do Gemini: ${imageResponse.status}`;
         
@@ -603,12 +631,29 @@ export async function POST(request: Request) {
 
       const imageData = await imageResponse.json();
       
+      console.log(`[generate] Resposta parseada com sucesso. Estrutura:`, {
+        hasCandidates: !!imageData?.candidates,
+        candidatesLength: imageData?.candidates?.length || 0,
+      });
+      
       // O Gemini retorna a imagem em base64 no campo inlineData
       const imagePart = imageData?.candidates?.[0]?.content?.parts?.find(
         (part: any) => part.inlineData
       );
-      const imageBase64 = imagePart?.inlineData?.data;
-      const imageMimeType = imagePart?.inlineData?.mimeType || 'image/png';
+      
+      if (!imagePart || !imagePart.inlineData) {
+        console.error("[generate] Resposta não contém imagem inline:", JSON.stringify(imageData, null, 2).substring(0, 1000));
+        await savePostToDb(payload, postText, null);
+        return NextResponse.json({
+          post: postText,
+          imageError: "A API retornou uma resposta sem imagem. Tente novamente.",
+        });
+      }
+      
+      const imageBase64 = imagePart.inlineData.data;
+      const imageMimeType = imagePart.inlineData.mimeType || 'image/png';
+      
+      console.log(`[generate] Imagem extraída: ${imageBase64.length} caracteres base64, tipo: ${imageMimeType}`);
       
       let imageUrl: string | null = null;
       
