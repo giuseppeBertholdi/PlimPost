@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Configurações para Netlify Functions
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 26; // Netlify permite até 26 segundos no plano gratuito
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -228,20 +233,33 @@ QUALIDADE: 1080x1080px, alta qualidade, PNG, pronto para publicação.
 
 export async function POST(request: Request) {
   try {
+    console.log("[generate] Iniciando requisição de geração de post");
+    
     const apiKey = process.env.GEMINI_API_KEY;
     const textModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
     const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash";
     const captionModel = process.env.GEMINI_CAPTION_MODEL || "gemini-2.5-flash";
 
     if (!apiKey) {
-      console.error("GEMINI_API_KEY não configurada");
+      console.error("[generate] GEMINI_API_KEY não configurada");
       return NextResponse.json(
         { error: "GEMINI_API_KEY não configurada no ambiente." },
         { status: 500 }
       );
     }
 
-    const payload = (await request.json()) as GeneratePayload;
+    // Parse do payload com tratamento de erro
+    let payload: GeneratePayload;
+    try {
+      payload = await request.json() as GeneratePayload;
+      console.log("[generate] Payload parseado com sucesso");
+    } catch (parseError) {
+      console.error("[generate] Erro ao fazer parse do JSON:", parseError);
+      return NextResponse.json(
+        { error: "Erro ao processar os dados da requisição. Verifique se os dados estão no formato correto." },
+        { status: 400 }
+      );
+    }
 
     if (!payload?.onboarding || !payload?.mainTheme || !payload?.objective) {
       return NextResponse.json(
@@ -726,12 +744,22 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       });
     }
   } catch (error) {
-    console.error("Generate API error:", error);
+    console.error("[generate] Erro na API de geração:", error);
+    
+    // Log detalhado do erro para debug
+    if (error instanceof Error) {
+      console.error("[generate] Detalhes do erro:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500), // Primeiros 500 chars do stack
+      });
+    }
     
     // Verificar se foi timeout ou abort
     if (error instanceof Error) {
       // Erros de timeout/abort
       if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
+        console.error("[generate] Timeout detectado");
         return NextResponse.json(
           {
             error: "A requisição demorou muito para ser processada. O servidor tem um limite de tempo. Tente novamente com uma imagem mais simples ou sem imagem de inspiração.",
@@ -743,6 +771,7 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       
       // Verificar se é um erro de timeout do Netlify
       if (error.message.includes('Inactivity Timeout') || error.message.includes('504')) {
+        console.error("[generate] Timeout do Netlify detectado");
         return NextResponse.json(
           {
             error: "A geração do post demorou muito e foi interrompida pelo servidor. Isso pode acontecer quando a API está lenta. Tente novamente ou simplifique a solicitação.",
@@ -754,6 +783,7 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
       
       // Erros de rede ou conexão
       if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        console.error("[generate] Erro de rede detectado");
         return NextResponse.json(
           {
             error: "Erro de conexão com a API. Verifique sua conexão com a internet e tente novamente.",
@@ -762,9 +792,22 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
           { status: 502 }
         );
       }
+      
+      // Erros de parsing JSON
+      if (error.message.includes('JSON') || error.message.includes('parse') || error.name === 'SyntaxError') {
+        console.error("[generate] Erro de parsing JSON detectado");
+        return NextResponse.json(
+          {
+            error: "Erro ao processar os dados da requisição. Verifique se os dados estão no formato correto.",
+            parseError: true,
+          },
+          { status: 400 }
+        );
+      }
     }
     
     // Erro genérico - retornar 502 para erros de gateway/proxy
+    console.error("[generate] Erro genérico não tratado, retornando 502");
     return NextResponse.json(
       {
         error: error instanceof Error 
