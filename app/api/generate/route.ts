@@ -490,8 +490,8 @@ export async function POST(request: Request) {
         enhancedPrompt += "\n\nIMPORTANTE: Use esta imagem como referência visual e estilo para criar uma imagem similar, mas única e original.";
       }
 
-      // Timeout de 25s para OpenAI (dentro do limite do Netlify de 26s)
-      const imageTimeoutDuration = 25000;
+      // Timeout de 26s para OpenAI (máximo permitido pelo Netlify)
+      const imageTimeoutDuration = 26000;
       const imageController = new AbortController();
       const imageTimeout = setTimeout(() => imageController.abort(), imageTimeoutDuration);
       
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
           await savePostToDb(payload, postText, null);
           return NextResponse.json({
             post: postText,
-            imageError: `A geração da imagem demorou mais de ${Math.round(imageTimeoutDuration / 1000)} segundos e foi interrompida. O modelo ${finalImageModel} pode estar lento. Tente novamente.`,
+            imageError: `A geração da imagem demorou mais de ${Math.round(imageTimeoutDuration / 1000)} segundos e foi interrompida. Isso pode acontecer quando: • O modelo está processando uma imagem complexa • A conexão está lenta • O servidor está sobrecarregado Tente: • Simplificar o tema do post • Remover a imagem de inspiração • Tentar novamente em alguns instantes`,
             timeout: true,
           });
         }

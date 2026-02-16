@@ -128,6 +128,9 @@ Gere a imagem modificada conforme a solicitação do usuário.
 };
 
 export async function POST(request: Request) {
+  // Timeout para imagem (26s - máximo permitido pelo Netlify)
+  const imageTimeoutDuration = 26000;
+  
   try {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -280,7 +283,7 @@ export async function POST(request: Request) {
 
       // Timeout para imagem
       const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => imageController.abort(), 25000);
+      const imageTimeout = setTimeout(() => imageController.abort(), imageTimeoutDuration);
 
       const imageResponse = await fetch(
         `https://api.openai.com/v1/images/generations`,
@@ -351,7 +354,7 @@ export async function POST(request: Request) {
     if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
       return NextResponse.json(
         {
-          error: "A modificação demorou muito para ser processada. Tente novamente.",
+          error: `A geração da imagem demorou mais de ${Math.round(imageTimeoutDuration / 1000)} segundos e foi interrompida. Isso pode acontecer quando: • O modelo está processando uma imagem complexa • A conexão está lenta • O servidor está sobrecarregado Tente: • Simplificar a solicitação • Tentar novamente em alguns instantes`,
           timeout: true,
         },
         { status: 504 }
