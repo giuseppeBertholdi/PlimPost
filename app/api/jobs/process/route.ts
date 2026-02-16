@@ -4,7 +4,7 @@ import { processJob } from "@/lib/process-job";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutos para processar (pode ser maior que 26s)
+export const maxDuration = 26; // Netlify limita a 26s, então retornamos imediatamente
 
 export async function POST(request: Request) {
   try {
@@ -52,55 +52,54 @@ export async function POST(request: Request) {
     const job = jobs[0];
     const payload = job.payload as any;
 
-    console.log(`[jobs/process] Processando job ${job.id}`);
+    console.log(`[jobs/process] Iniciando processamento do job ${job.id}`);
 
-    // Processar o job (processJob já tem timeout interno de 4 minutos)
-    try {
-      const result = await processJob(job.id, payload);
-      console.log(`[jobs/process] Job ${job.id} processado com sucesso`);
-      
-      return NextResponse.json({
-        message: "Job processado com sucesso.",
-        jobId: job.id,
-        result,
-        processed: true,
-      });
-    } catch (error) {
-      console.error(`[jobs/process] Erro ao processar job ${job.id}:`, error);
-      
+    // Marcar job como processing ANTES de retornar
+    // Isso garante que mesmo se a função for morta pelo Netlify, o job já está marcado
+    await supabaseAdmin
+      .from("generation_jobs")
+      .update({
+        status: "processing",
+        started_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+
+    // Processar o job em background (não esperar resultado para evitar timeout)
+    // Isso permite que o Netlify retorne antes dos 26s
+    // O processamento continua mesmo após a função retornar (até o Netlify matar o processo)
+    processJob(job.id, payload).catch(error => {
+      console.error(`[jobs/process] Erro ao processar job ${job.id} em background:`, error);
       // O processJob já atualiza o status para failed, mas garantimos aqui também
-      // caso o erro aconteça antes de processJob ser chamado
       try {
-        const { data: currentJob } = await supabaseAdmin
+        supabaseAdmin
           .from("generation_jobs")
           .select("status")
           .eq("id", job.id)
-          .single();
-        
-        // Só atualiza se ainda estiver em processing (não foi atualizado pelo processJob)
-        if (currentJob?.status === "processing") {
-          await supabaseAdmin
-            .from("generation_jobs")
-            .update({
-              status: "failed",
-              error_message: error instanceof Error ? error.message : "Erro ao processar job",
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", job.id);
-        }
+          .single()
+          .then(({ data: currentJob }) => {
+            if (currentJob?.status === "processing") {
+              supabaseAdmin
+                .from("generation_jobs")
+                .update({
+                  status: "failed",
+                  error_message: error instanceof Error ? error.message : "Erro ao processar job",
+                  completed_at: new Date().toISOString(),
+                })
+                .eq("id", job.id);
+            }
+          });
       } catch (updateError) {
         console.error(`[jobs/process] Erro ao atualizar job ${job.id} para failed:`, updateError);
       }
-      
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "Erro ao processar job.",
-          jobId: job.id,
-          processed: false,
-        },
-        { status: 500 }
-      );
-    }
+    });
+
+    // Retornar imediatamente (antes dos 26s do Netlify)
+    // O processamento continua em background
+    return NextResponse.json({
+      message: "Job iniciado para processamento em background.",
+      jobId: job.id,
+      processed: true,
+    });
   } catch (error) {
     console.error("[jobs/process] Erro na API:", error);
     return NextResponse.json(

@@ -30,18 +30,22 @@ export async function processJob(jobId: string, payload: GeneratePayload) {
     .eq("id", jobId)
     .single();
 
-  if (existingJob?.status !== "pending") {
-    throw new Error(`Job já está em status: ${existingJob?.status}`);
+  // Se já está em processing, pode ser que outro worker já esteja processando
+  // ou que este worker já tenha marcado como processing antes
+  if (existingJob?.status === "completed" || existingJob?.status === "failed") {
+    throw new Error(`Job já foi processado. Status: ${existingJob?.status}`);
   }
 
-  // Atualizar status para processing
-  await supabaseAdmin
-    .from("generation_jobs")
-    .update({
-      status: "processing",
-      started_at: new Date().toISOString(),
-    })
-    .eq("id", jobId);
+  // Se ainda não está em processing, atualizar (pode já estar se foi chamado pelo endpoint)
+  if (existingJob?.status === "pending") {
+    await supabaseAdmin
+      .from("generation_jobs")
+      .update({
+        status: "processing",
+        started_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+  }
 
   // Timeout de 4 minutos para o processamento completo
   const timeoutPromise = new Promise((_, reject) => {
