@@ -216,16 +216,23 @@ const buildImagePrompt = (payload: GeneratePayload, postText: string) => {
   const titleText = lines[0] || fullText.split('.')[0] || fullText.substring(0, 50);
   const bodyText = lines.slice(1).join(' ') || fullText.substring(titleText.length).trim();
 
-  return `Crie imagem 1080x1080px para Instagram. 70% visual, 30% texto.
+  return `IMAGEM INSTAGRAM 1080x1080px. ALTA QUALIDADE. FOCO VISUAL.
 
-MARCA: ${payload.onboarding.business_name} | ${payload.onboarding.business_description} | Diferencial: ${payload.onboarding.business_differential} | Tom: ${tones}
-${logoUrl ? `LOGO: Use a logo fornecida EXATAMENTE como está, sem modificações. Apenas ajuste tamanho mantendo proporções.` : ''}
-CORES: ${paletteColors} - Use como base, crie gradientes. NUNCA mostre códigos hex ou swatches.
-ESTILO: ${imageStyleDesc}
-${mainTheme ? `TEMA: "${mainTheme}" - Represente visualmente.` : ''}${extraInfo ? `EXTRA: "${extraInfo}" - Inclua na imagem.` : ''}
-${payload.inspirationImage ? `INSPIRAÇÃO: Use a imagem fornecida como referência de composição e estilo.` : ''}
-TEXTO: TÍTULO "${titleText}" (${descTitle}, grande, 3-5 palavras, ${textStyleDesc})${bodyText ? ` | CORPO "${bodyText}" (${descText}, pequeno, 1 linha)` : ''}
-REGRAS: 70% elementos visuais (formas, gradientes, padrões, ícones) + 30% texto. Fundo rico visualmente. NUNCA mencione nomes de fontes ou códigos de cores na imagem. Apenas USE visualmente.
+MARCA: ${payload.onboarding.business_name} (${payload.onboarding.business_description}, ${payload.onboarding.business_differential}). Tom: ${tones}.
+${logoUrl ? `LOGO: Use a logo fornecida EXATAMENTE como está, sem modificações, alterações ou adaptações. Mantenha cores, formas e proporções originais. Apenas ajuste o tamanho/escala se necessário.` : ''}
+CORES: ${paletteColors} - Use como base, crie gradientes suaves e harmoniosos. NUNCA mostre códigos hex ou swatches.
+ESTILO: ${imageStyleDesc}. Priorize elementos visuais ricos e atraentes.
+${mainTheme ? `TEMA: "${mainTheme}" - Represente visualmente com elementos gráficos, ícones ou ilustrações.` : ''}${extraInfo ? `EXTRA: "${extraInfo}" - Integre na composição visual.` : ''}
+${payload.inspirationImage ? `INSPIRAÇÃO: Use a imagem fornecida como referência de composição, estilo e layout.` : ''}
+TEXTO: TÍTULO "${titleText}" (${descTitle}, ${textStyleDesc}, máximo 5 palavras)${bodyText ? `. CORPO "${bodyText}" (${descText}, 1 linha, discreto).` : ''}
+REGRAS CRÍTICAS:
+- 80% elementos visuais (formas, gradientes, padrões, ícones, ilustrações, elementos gráficos) + 20% texto máximo
+- Fundo rico e visualmente atraente com gradientes, formas geométricas ou padrões sutis
+- Design intuitivo, bonito e moderno que chame atenção
+- Texto deve ser legível mas discreto, não dominar a imagem
+- Priorize impacto visual sobre quantidade de texto
+- NUNCA mencione nomes de fontes, códigos hex, URLs, @, contatos falsos ou swatches na imagem
+- Apenas USE visualmente as cores e fontes, sem mencioná-las
 PROIBIDO: Nomes de fontes, códigos hex, swatches, informações técnicas, sites/URLs/perfis inventados.
 QUALIDADE: 1080x1080px, alta qualidade, PNG, pronto para publicação.
 `.trim();
