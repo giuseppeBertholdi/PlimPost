@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     console.log(`[jobs/process] Processando job ${job.id}`);
 
-    // Processar o job
+    // Processar o job (processJob já tem timeout interno de 4 minutos)
     try {
       const result = await processJob(job.id, payload);
       console.log(`[jobs/process] Job ${job.id} processado com sucesso`);
@@ -67,6 +67,31 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       console.error(`[jobs/process] Erro ao processar job ${job.id}:`, error);
+      
+      // O processJob já atualiza o status para failed, mas garantimos aqui também
+      // caso o erro aconteça antes de processJob ser chamado
+      try {
+        const { data: currentJob } = await supabaseAdmin
+          .from("generation_jobs")
+          .select("status")
+          .eq("id", job.id)
+          .single();
+        
+        // Só atualiza se ainda estiver em processing (não foi atualizado pelo processJob)
+        if (currentJob?.status === "processing") {
+          await supabaseAdmin
+            .from("generation_jobs")
+            .update({
+              status: "failed",
+              error_message: error instanceof Error ? error.message : "Erro ao processar job",
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", job.id);
+        }
+      } catch (updateError) {
+        console.error(`[jobs/process] Erro ao atualizar job ${job.id} para failed:`, updateError);
+      }
+      
       return NextResponse.json(
         {
           error: error instanceof Error ? error.message : "Erro ao processar job.",

@@ -121,15 +121,26 @@ SELECT * FROM generation_jobs WHERE status = 'failed' ORDER BY created_at DESC;
 
 ### Jobs ficam em "processing" por muito tempo
 
-1. Verifique se o worker está rodando
-2. Verifique logs para erros de API (Gemini/OpenAI)
-3. Jobs podem ser marcados como `failed` automaticamente
+1. **Resetar jobs travados**: Chame `/api/jobs/reset-stuck` para resetar jobs travados há mais de 5 minutos
+2. Verifique se o worker está rodando
+3. Verifique logs para erros de API (Gemini/OpenAI)
+4. Jobs são automaticamente marcados como `failed` após timeout de 4 minutos
+
+**Solução rápida**: Configure um cron job para chamar `/api/jobs/reset-stuck` periodicamente:
+
+```toml
+# netlify.toml
+[[plugins.inputs.schedules]]
+  cron = "*/5 * * * *"  # A cada 5 minutos
+  path = "/api/jobs/reset-stuck"
+```
 
 ### Frontend não recebe resultado
 
 1. Verifique se o polling está funcionando (console do navegador)
 2. Verifique se o job foi completado no banco
 3. Verifique timeout do polling (máximo 5 minutos)
+4. Se o job estiver travado, use `/api/jobs/reset-stuck` para resetá-lo
 
 ## 📝 Notas
 

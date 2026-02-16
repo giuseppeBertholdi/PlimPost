@@ -11,7 +11,27 @@ export async function processJob(jobId: string, payload: GeneratePayload) {
   const captionModel = process.env.GEMINI_CAPTION_MODEL || "gemini-2.5-flash";
 
   if (!geminiApiKey || !openaiApiKey || !supabaseAdmin) {
+    // Atualizar status para failed antes de lançar erro
+    await supabaseAdmin
+      .from("generation_jobs")
+      .update({
+        status: "failed",
+        error_message: "APIs não configuradas",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
     throw new Error("APIs não configuradas");
+  }
+
+  // Verificar se o job já está sendo processado por outro worker
+  const { data: existingJob } = await supabaseAdmin
+    .from("generation_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .single();
+
+  if (existingJob?.status !== "pending") {
+    throw new Error(`Job já está em status: ${existingJob?.status}`);
   }
 
   // Atualizar status para processing
@@ -22,6 +42,48 @@ export async function processJob(jobId: string, payload: GeneratePayload) {
       started_at: new Date().toISOString(),
     })
     .eq("id", jobId);
+
+  // Timeout de 4 minutos para o processamento completo
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error("Timeout: Processamento demorou mais de 4 minutos"));
+    }, 240000); // 4 minutos
+  });
+
+  try {
+    // Executar processamento com timeout
+    const result = await Promise.race([
+      processJobInternal(jobId, payload, geminiApiKey, openaiApiKey, textModel, imageModel, captionModel),
+      timeoutPromise,
+    ]) as any;
+    return result;
+  } catch (error) {
+    // Garantir que o status seja atualizado mesmo em caso de erro
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao processar job";
+    await supabaseAdmin
+      .from("generation_jobs")
+      .update({
+        status: "failed",
+        error_message: errorMessage,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+    throw error;
+  }
+}
+
+async function processJobInternal(
+  jobId: string,
+  payload: GeneratePayload,
+  geminiApiKey: string,
+  openaiApiKey: string,
+  textModel: string,
+  imageModel: string,
+  captionModel: string
+) {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase não configurado");
+  }
 
   try {
     // 1. Gerar texto do post
@@ -275,15 +337,18 @@ Crie uma legenda autêntica, envolvente e completa para este post do Instagram.
   } catch (error) {
     // Atualizar job com erro
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao processar job";
-    await supabaseAdmin
-      .from("generation_jobs")
-      .update({
-        status: "failed",
-        error_message: errorMessage,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
-
+    try {
+      await supabaseAdmin
+        .from("generation_jobs")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    } catch (updateError) {
+      console.error(`[process-job] Erro ao atualizar status do job ${jobId} para failed:`, updateError);
+    }
     throw error;
   }
 }
