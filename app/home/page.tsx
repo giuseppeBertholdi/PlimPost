@@ -105,7 +105,6 @@ export default function HomePage() {
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
   
   // Estado de créditos
   const [credits, setCredits] = useState<number | null>(null);
@@ -494,7 +493,6 @@ export default function HomePage() {
 
   const handleGenerate = async () => {
     setErrorMessage(null);
-    setImageError(null);
     setGeneratedPost("");
     setGeneratedImage(null);
     setShowChat(false);
@@ -541,10 +539,10 @@ export default function HomePage() {
     let inspirationImageBase64: string | undefined = undefined;
     if (inspirationImageFile) {
       try {
-        // Limitar tamanho da imagem (1MB antes da compressão)
-        const MAX_IMAGE_SIZE = 1 * 1024 * 1024; // 1MB
+        // Limitar tamanho da imagem (2MB)
+        const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
         if (inspirationImageFile.size > MAX_IMAGE_SIZE) {
-          setErrorMessage("A imagem de inspiração é muito grande. Use uma imagem menor que 1MB ou remova a imagem.");
+          setErrorMessage("A imagem de inspiração é muito grande. Use uma imagem menor que 2MB ou remova a imagem.");
           setIsGenerating(false);
           isGeneratingRef.current = false;
           return;
@@ -555,8 +553,8 @@ export default function HomePage() {
           type: inspirationImageFile.type
         });
 
-        // Comprimir a imagem antes de converter para base64 (800px, qualidade 0.7 para reduzir tamanho)
-        const compressedImage = await compressImage(inspirationImageFile, 800, 0.7);
+        // Comprimir a imagem antes de converter para base64
+        const compressedImage = await compressImage(inspirationImageFile, 1024, 0.8);
         
         console.log("✅ Imagem comprimida:", {
           originalSize: inspirationImageFile.size,
@@ -587,21 +585,11 @@ export default function HomePage() {
       }
     }
 
-    // Criar payload otimizado - apenas campos necessários do onboarding
-    const optimizedOnboarding = {
-      business_name: onboarding.business_name,
-      business_description: onboarding.business_description,
-      business_differential: onboarding.business_differential,
-      tone_tags: onboarding.tone_tags,
-      target_audience: onboarding.target_audience,
-    };
-
-    // Construir payload removendo campos undefined e otimizando
-    const payload: any = {
-      onboarding: optimizedOnboarding,
+    const payload = {
+      onboarding,
       objective: finalObjective,
       mainTheme: mainTheme.trim(),
-      extraInfo: extraInfo.trim() || undefined,
+      extraInfo: extraInfo.trim(),
       palette: {
         name:
           selectedPalette < 0
@@ -611,18 +599,12 @@ export default function HomePage() {
       },
       fontTitle: DEFAULT_FONT_TITLE,
       fontText: DEFAULT_FONT_TEXT,
+      additionalText: additionalText.trim() || undefined,
       imageStyle: imageStyle,
       textStyle: textStyle,
       userId: currentUserId,
+      inspirationImage: inspirationImageBase64,
     };
-
-    // Adicionar campos opcionais apenas se tiverem valor
-    if (additionalText.trim()) {
-      payload.additionalText = additionalText.trim();
-    }
-    if (inspirationImageBase64) {
-      payload.inspirationImage = inspirationImageBase64;
-    }
 
     try {
       console.log("🚀 Iniciando geração de post...", { 
@@ -634,37 +616,87 @@ export default function HomePage() {
         inspirationImageSize: inspirationImageBase64?.length || 0
       });
 
-      // Criar um AbortController com timeout de 60 segundos
-      // O servidor pode levar até 18s (texto) + 18s (imagem) + 15s (caption) = ~51s + overhead
+      // Criar um AbortController com timeout de 25 segundos (mais que o limite do Netlify)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.warn("⏱️ Timeout do cliente atingido (60s)");
+        console.warn("⏱️ Timeout do cliente atingido (25s)");
         controller.abort();
-      }, 60000);
+      }, 25000);
 
-      // Chamada direta à API (modo síncrono simplificado)
       let response: Response;
       try {
         response = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: controller.signal,
+          signal: controller.signal, // Adicionar o signal para permitir cancelamento
         });
         clearTimeout(timeoutId);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error("TIMEOUT_CLIENT");
+          throw new Error("A requisição demorou muito e foi cancelada. Tente novamente com uma imagem menor ou sem imagem de inspiração.");
         }
         throw fetchError;
       }
 
+      console.log("📡 Resposta recebida:", { 
+        status: response.status, 
+        ok: response.ok,
+        contentType: response.headers.get("content-type")
+      });
+
+      // Verificar se a resposta é JSON antes de fazer o parse
+      const contentType = response.headers.get("content-type");
+      let data: any;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+        console.log("✅ JSON parseado com sucesso:", { 
+          hasPost: !!data.post, 
+          hasImage: !!(data.image || data.imageUrl),
+          postLength: data.post?.length || 0
+        });
+      } else {
+        // Se não for JSON, tentar ler como texto para debug
+        const text = await response.text();
+        console.error("❌ Resposta não é JSON:", text.substring(0, 500));
+        throw new Error(
+          response.status === 404
+            ? "Rota da API não encontrada. Verifique se o servidor está configurado corretamente."
+            : `Erro no servidor (${response.status}). Tente novamente mais tarde.`
+        );
+      }
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        console.error("❌ Resposta não OK:", { status: response.status, data });
+        // Handle timeout errors (504 Gateway Timeout)
+        if (response.status === 504 || data?.timeout) {
+          const timeoutMessage = data?.error || 
+            "A geração do post está demorando mais que o esperado. Isso pode acontecer quando há muitas requisições simultâneas ou quando a API do Gemini está lenta. Tente novamente em alguns instantes.";
+          throw new Error(timeoutMessage);
+        }
+        // Handle bad gateway errors (502)
+        if (response.status === 502 || data?.serverError || data?.networkError) {
+          const serverErrorMessage = data?.error || 
+            "O servidor está temporariamente indisponível ou houve um erro ao processar sua requisição. Isso pode ser causado por:\n" +
+            "• Limite de tempo do servidor excedido\n" +
+            "• Problemas temporários com a API do Gemini\n" +
+            "• Sobrecarga do servidor\n\n" +
+            "Por favor, tente novamente em alguns instantes. Se o problema persistir, tente simplificar sua solicitação (remover imagem de inspiração ou reduzir informações adicionais).";
+          throw new Error(serverErrorMessage);
+        }
+        // Handle quota exceeded errors with retry information
+        if (data?.quotaExceeded) {
+          const retryInfo = data.retryAfter 
+            ? ` Tente novamente em aproximadamente ${Math.ceil(data.retryAfter)} segundos.`
+            : "";
+          throw new Error(data.error + retryInfo);
+        }
         // Handle insufficient credits
-        if (errorData?.insufficientCredits || response.status === 402) {
-          setErrorMessage(errorData.error || "Créditos insuficientes. Compre mais créditos para continuar gerando posts.");
+        if (data?.insufficientCredits || response.status === 402) {
+          setErrorMessage(data.error || "Créditos insuficientes. Compre mais créditos para continuar gerando posts.");
+          // Recarregar créditos
           if (user?.id) {
             try {
               const creditsResponse = await fetch(`/api/credits?userId=${user.id}`);
@@ -676,32 +708,30 @@ export default function HomePage() {
               console.error("Erro ao recarregar créditos:", err);
             }
           }
-          throw new Error(errorData.error || "Créditos insuficientes");
+          throw new Error(data.error || "Créditos insuficientes");
         }
-        throw new Error(errorData?.error || "Erro ao gerar post.");
+        throw new Error(data?.error || "Erro ao gerar o post.");
       }
 
-      const result = await response.json();
+      // Verificar se temos dados válidos
+      if (!data.post && !data.image && !data.imageUrl) {
+        console.error("⚠️ Resposta OK mas sem dados:", data);
+        throw new Error("A API retornou sucesso, mas não gerou nenhum conteúdo. Tente novamente.");
+      }
 
-      console.log("✨ Resultado recebido:", { 
-        hasPost: !!result.post, 
-        hasImage: !!(result.image || result.imageUrl),
-        postLength: result.post?.length || 0
+      console.log("✨ Definindo resultados:", { 
+        postLength: data.post?.length || 0,
+        hasImage: !!(data.image || data.imageUrl),
+        imageType: data.image ? 'base64' : data.imageUrl ? 'url' : 'none'
       });
 
-      setGeneratedPost(result.post ?? "");
-      setGeneratedImage(result.imageUrl ?? result.image ?? null);
-      
-      if (result.imageError) {
-        setImageError(result.imageError);
-      } else {
-        setImageError(null);
-      }
+      setGeneratedPost(data.post ?? "");
+      // Usar imageUrl se disponível (imagem salva), senão usar base64
+      setGeneratedImage(data.imageUrl ?? data.image ?? null);
       
       console.log("✅ Estados atualizados:", { 
-        generatedPost: !!result.post, 
-        generatedImage: !!(result.imageUrl || result.image),
-        imageError: result.imageError || null
+        generatedPost: !!data.post, 
+        generatedImage: !!(data.imageUrl || data.image) 
       });
       
       // Inicializar chat com mensagem de boas-vindas
@@ -729,17 +759,15 @@ export default function HomePage() {
       
       if (error instanceof Error) {
         // Erro de timeout do cliente (AbortError)
-        if (error.name === 'AbortError' || error.message.includes("cancelada") || error.message.includes("demorou muito") || error.message === "TIMEOUT_CLIENT") {
+        if (error.name === 'AbortError' || error.message.includes("cancelada") || error.message.includes("demorou muito")) {
           message = "A requisição demorou muito e foi cancelada. Isso pode acontecer quando:\n" +
             "• A imagem de inspiração é muito grande\n" +
             "• A conexão está lenta\n" +
-            "• O servidor está sobrecarregado\n" +
-            "• A API do Gemini está demorando para responder\n\n" +
+            "• O servidor está sobrecarregado\n\n" +
             "Tente:\n" +
             "• Remover a imagem de inspiração\n" +
-            "• Usar uma imagem menor (menos de 1MB)\n" +
+            "• Usar uma imagem menor\n" +
             "• Simplificar o tema do post\n" +
-            "• Reduzir informações adicionais\n" +
             "• Tentar novamente em alguns instantes";
         }
         // Se for um erro de parsing JSON, dar uma mensagem mais clara
@@ -818,18 +846,18 @@ export default function HomePage() {
                 Menu
               </summary>
               <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 shadow-lg">
-            <a
-              href="/galeria"
+                <a
+                  href="/galeria"
                   className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
-            >
-              Galeria
-            </a>
-            <a
-              href="/marca"
+                >
+                  Galeria
+                </a>
+                <a
+                  href="/marca"
                   className="block rounded-xl px-3 py-2 transition hover:bg-zinc-50"
-            >
-              Minha Marca
-            </a>
+                >
+                  Minha Marca
+                </a>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -886,7 +914,7 @@ export default function HomePage() {
               <AdSidebar />
             </aside>
             
-          {/* Conteúdo Principal */}
+            {/* Conteúdo Principal */}
             <div className="flex-1 min-w-0">
             <div className="mb-6 text-center sm:mb-8">
           <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl md:text-4xl">
@@ -1247,7 +1275,7 @@ export default function HomePage() {
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                       {selectedPalette < 0 ? "Paleta Personalizada" : paletteOptions[selectedPalette]?.name ?? "Personalizada"}
-                  </span>
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
                     {selectedPaletteColors.map((color, index) => (
@@ -1264,27 +1292,27 @@ export default function HomePage() {
                             boxShadow: `0 4px 12px ${color}40, 0 0 0 2px white`
                           }}
                         >
-                        <input
-                          type="color"
-                          value={color}
-                          onChange={(e) => {
+                          <input
+                            type="color"
+                            value={color}
+                            onChange={(e) => {
                               e.stopPropagation();
-                            // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
-                            if (selectedPalette >= 0) {
-                              const newPalette = [...selectedPaletteColors];
-                              newPalette[index] = e.target.value;
-                              setCustomPalette(newPalette);
-                              setSelectedPalette(-1);
-                            } else {
-                              // Se já for personalizada, apenas atualizar
-                              const newPalette = [...customPalette];
-                              newPalette[index] = e.target.value;
-                              setCustomPalette(newPalette);
-                            }
-                          }}
+                              // Se estiver usando uma paleta pré-definida, converter para personalizada ao editar
+                              if (selectedPalette >= 0) {
+                                const newPalette = [...selectedPaletteColors];
+                                newPalette[index] = e.target.value;
+                                setCustomPalette(newPalette);
+                                setSelectedPalette(-1);
+                              } else {
+                                // Se já for personalizada, apenas atualizar
+                                const newPalette = [...customPalette];
+                                newPalette[index] = e.target.value;
+                                setCustomPalette(newPalette);
+                              }
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                        />
+                          />
                         </div>
                         <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-zinc-900 px-2 py-1 text-xs font-mono text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 pointer-events-none z-10">
                           {color.toUpperCase()}
@@ -1298,8 +1326,8 @@ export default function HomePage() {
                   💡 Clique nas cores para personalizar ou "Alterar" para escolher uma paleta pronta
                 </p>
               </div>
-                  </div>
-                  </div>
+            </div>
+          </div>
 
           {/* Botão de Gerar */}
           <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-4 sm:p-6">
@@ -1308,7 +1336,7 @@ export default function HomePage() {
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-xl text-white">
                     ⚠
-                </div>
+                  </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-red-800 sm:text-base">{errorMessage}</p>
                     {errorMessage.includes("Créditos insuficientes") && (
@@ -1319,8 +1347,8 @@ export default function HomePage() {
                         💎 Comprar Créditos Agora
                       </a>
                     )}
+                  </div>
                 </div>
-              </div>
               </div>
             )}
             <button
@@ -1330,15 +1358,12 @@ export default function HomePage() {
               className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-lg"
             >
               {isGenerating ? (
-                <span className="flex flex-col items-center justify-center gap-2">
                 <span className="flex items-center justify-center gap-2">
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Gerando seu post...
-                  </span>
-                  <span className="text-xs opacity-75">Isso pode levar até 60 segundos. Por favor, aguarde...</span>
                 </span>
               ) : (
                 "✨ Gerar Post para Instagram"
@@ -1366,7 +1391,6 @@ export default function HomePage() {
                 onClick={() => {
                   setGeneratedImage(null);
                   setGeneratedPost("");
-                  setImageError(null);
                   setMainTheme("");
                   setExtraInfo("");
                   setAdditionalText("");
@@ -1382,27 +1406,20 @@ export default function HomePage() {
               </button>
               </div>
               {generatedImage ? (
-              <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
-                <img
-                  src={generatedImage}
-                  alt="Post gerado para Instagram"
-                  className="h-full w-full object-contain"
+                <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-2xl shadow-xl">
+                  <img
+                    src={generatedImage}
+                    alt="Post gerado para Instagram"
+                    className="h-full w-full object-contain"
                     onError={(e) => {
                       console.error("Erro ao carregar imagem:", e);
                       setErrorMessage("Erro ao carregar a imagem gerada. O texto foi gerado com sucesso.");
                     }}
-                />
-              </div>
+                  />
+                </div>
               ) : generatedPost ? (
                 <div className="mx-auto rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-6 text-center">
-                  <p className="text-sm text-orange-700">
-                    {imageError || "⚠️ A imagem não pôde ser gerada, mas o texto foi criado com sucesso."}
-                  </p>
-                  {imageError && imageError.includes("Limite de requisições") && (
-                    <p className="mt-2 text-xs text-orange-600">
-                      💡 Dica: O limite de requisições do Gemini foi atingido. Isso acontece quando há muitas requisições em um curto período. Tente novamente em alguns minutos.
-                    </p>
-                  )}
+                  <p className="text-sm text-orange-700">⚠️ A imagem não pôde ser gerada, mas o texto foi criado com sucesso.</p>
                 </div>
               ) : null}
               {/* Legenda Gerada */}
@@ -1445,44 +1462,44 @@ export default function HomePage() {
               <div className="mt-4 flex items-center justify-center gap-3">
                 {generatedImage && (
                   <>
-                <button
-                  type="button"
-                  onClick={() => {
+                    <button
+                      type="button"
+                      onClick={() => {
                         if (!generatedImage) return;
-                    const link = document.createElement('a');
-                    link.href = generatedImage;
-                    link.download = `post-instagram-${Date.now()}.png`;
-                    link.click();
-                  }}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                >
-                  <span>💾</span>
-                  Baixar imagem
-                </button>
-                <button
-                  type="button"
-                  onClick={async (event) => {
+                        const link = document.createElement('a');
+                        link.href = generatedImage;
+                        link.download = `post-instagram-${Date.now()}.png`;
+                        link.click();
+                      }}
+                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    >
+                      <span>💾</span>
+                      Baixar imagem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (event) => {
                         if (!generatedImage) return;
-                    try {
-                      await navigator.clipboard.writeText(generatedImage);
-                      // Feedback visual melhorado
-                      const btn = event.currentTarget;
-                      const originalText = btn.innerHTML;
-                      btn.innerHTML = '<span>✓</span> Copiado!';
-                      btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-                      setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
-                      }, 2000);
-                    } catch (err) {
-                      alert('Erro ao copiar. Tente novamente.');
-                    }
-                  }}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                >
-                  <span>📋</span>
-                  Copiar link
-                </button>
+                        try {
+                          await navigator.clipboard.writeText(generatedImage);
+                          // Feedback visual melhorado
+                          const btn = event.currentTarget;
+                          const originalText = btn.innerHTML;
+                          btn.innerHTML = '<span>✓</span> Copiado!';
+                          btn.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+                          setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+                          }, 2000);
+                        } catch (err) {
+                          alert('Erro ao copiar. Tente novamente.');
+                        }
+                      }}
+                      className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    >
+                      <span>📋</span>
+                      Copiar link
+                    </button>
                   </>
                 )}
               </div>
@@ -1538,11 +1555,11 @@ export default function HomePage() {
                               </svg>
                               <span className="text-sm text-zinc-500">Processando modificação...</span>
                             </div>
-              </div>
-            </div>
-          )}
+                          </div>
+                        </div>
+                      )}
                       <div ref={chatEndRef} />
-          </div>
+                    </div>
                     
                     {/* Input do Chat */}
                     <form onSubmit={handleChatSubmit} className="border-t border-orange-200 bg-white/50 p-4">
@@ -1625,31 +1642,31 @@ export default function HomePage() {
             <div className="mb-6">
               <p className="mb-3 text-sm font-semibold text-zinc-700">Paletas pré-definidas</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {paletteOptions.map((palette, index) => (
-                <button
-                  key={palette.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPalette(index);
-                  }}
+                {paletteOptions.map((palette, index) => (
+                  <button
+                    key={palette.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPalette(index);
+                    }}
                     className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                    selectedPalette === index
+                      selectedPalette === index
                         ? "border-orange-400 bg-orange-50 text-orange-700 shadow-md scale-[1.02]"
                         : "border-zinc-200 bg-white text-zinc-600 hover:border-orange-300 hover:bg-orange-50/30 hover:shadow-sm"
-                  }`}
-                >
+                    }`}
+                  >
                     <span className="font-medium">{palette.name}</span>
                     <span className="flex items-center gap-1.5">
-                    {palette.colors.map((color) => (
-                      <span
-                        key={color}
+                      {palette.colors.map((color) => (
+                        <span
+                          key={color}
                           className="h-4 w-4 rounded-full border-2 border-white shadow-sm"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                </button>
-              ))}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1682,16 +1699,16 @@ export default function HomePage() {
                 ))}
               </div>
               <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPalette(-1);
-                  setIsPaletteOpen(false);
-                }}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPalette(-1);
+                    setIsPaletteOpen(false);
+                  }}
                   className="flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-orange-700 hover:shadow-xl"
-              >
-                Usar paleta personalizada
-              </button>
+                >
+                  Usar paleta personalizada
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsPaletteOpen(false)}
