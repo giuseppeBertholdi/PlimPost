@@ -702,6 +702,9 @@ export async function POST(request: Request) {
         if (imageResponse.status === 0 || imageResponse.type === 'error') {
           // Salvar post (só texto) na galeria mesmo quando a imagem falha por timeout
           await savePostToDb(payload, postText, null);
+          const elapsed = Date.now() - startTime;
+          console.timeEnd("⏱️ Total da requisição");
+          console.log(`⏱️ Tempo total: ${elapsed}ms`);
           return NextResponse.json({
             post: postText,
             imageError: "Timeout ao gerar a imagem, mas o texto foi gerado com sucesso. Tente gerar novamente para obter a imagem.",
@@ -711,11 +714,43 @@ export async function POST(request: Request) {
         
         const errorData = await imageResponse.json().catch(() => ({}));
         console.error("Gemini Image API error:", imageResponse.status, errorData);
-        // Salvar post (só texto) na galeria mesmo quando a imagem falha
+        
+        // Tratar erro 500 do Gemini (erro interno do servidor)
+        if (imageResponse.status === 500 || errorData?.error?.status === 'INTERNAL') {
+          console.warn("⚠️ Erro interno do Gemini (500) - tentando retornar texto");
+          await savePostToDb(payload, postText, null);
+          const elapsed = Date.now() - startTime;
+          console.timeEnd("⏱️ Total da requisição");
+          console.log(`⏱️ Tempo total: ${elapsed}ms`);
+          return NextResponse.json({
+            post: postText,
+            imageError: "O serviço de geração de imagens do Google está temporariamente indisponível (erro interno). O texto foi gerado com sucesso. Por favor, tente gerar novamente em alguns instantes.",
+            serverError: true,
+          });
+        }
+        
+        // Tratar erro 429 (quota/rate limit)
+        if (imageResponse.status === 429 || errorData?.error?.code === 429) {
+          console.warn("⚠️ Rate limit do Gemini atingido na geração de imagem");
+          await savePostToDb(payload, postText, null);
+          const elapsed = Date.now() - startTime;
+          console.timeEnd("⏱️ Total da requisição");
+          console.log(`⏱️ Tempo total: ${elapsed}ms`);
+          return NextResponse.json({
+            post: postText,
+            imageError: "Limite de requisições excedido na geração de imagem. O texto foi gerado com sucesso. Tente novamente em alguns instantes.",
+            quotaExceeded: true,
+          });
+        }
+        
+        // Outros erros
         await savePostToDb(payload, postText, null);
+        const elapsed = Date.now() - startTime;
+        console.timeEnd("⏱️ Total da requisição");
+        console.log(`⏱️ Tempo total: ${elapsed}ms`);
         return NextResponse.json({
           post: postText,
-          imageError: "Falha ao gerar a imagem, mas o texto foi gerado com sucesso.",
+          imageError: errorData?.error?.message || "Falha ao gerar a imagem, mas o texto foi gerado com sucesso. Tente gerar novamente.",
         });
       }
 
